@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Form from "next/form";
 import Link from "next/link";
 import { connection } from "next/server";
 import { query } from "@/lib/db";
@@ -27,13 +28,13 @@ async function HomeConteudo() {
           O Radar lê o Portal Nacional de Contratações Públicas diariamente e avisa quando sai uma licitação que combina com o que você
           vende, na sua região e na sua faixa de valor. Sem planilha, sem ficar abrindo portal.
         </p>
-        <form action="/buscar" className="filters" style={{ gridTemplateColumns: "1fr auto", maxWidth: 640 }}>
+        <Form action="/buscar" className="filters" style={{ gridTemplateColumns: "1fr auto", maxWidth: 640 }}>
           <label className="q">
             Experimente agora
             <input name="q" placeholder="ex.: material de limpeza, merenda escolar, notebook" />
           </label>
           <button type="submit">Buscar editais</button>
-        </form>
+        </Form>
         <p className="muted small">
           <b>{Number(stats.abertas).toLocaleString("pt-BR")}</b> licitações com propostas abertas agora ·{" "}
           <b>{Number(stats.hoje).toLocaleString("pt-BR")}</b> publicadas nas últimas 24h

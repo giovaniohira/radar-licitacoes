@@ -4,6 +4,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM deps AS build
+ARG BASE_PATH=""
+ENV BASE_PATH=$BASE_PATH
 COPY . .
 RUN npx next build
 

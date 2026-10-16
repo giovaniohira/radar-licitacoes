@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Form from "next/form";
 import Link from "next/link";
 import { connection } from "next/server";
 import { EditalCard } from "@/components/EditalCard";
@@ -29,7 +30,7 @@ async function BuscarConteudo({ searchParams }: PageProps<"/buscar">) {
   return (
     <main>
       <h2>Buscar editais</h2>
-      <form className="filters" action="/buscar">
+      <Form className="filters" action="/buscar">
         <label className="q">
           Palavras-chave (vírgula separa alternativas)
           <input name="q" defaultValue={f.palavras} placeholder="notebook, computador, impressora -locação" />
@@ -61,7 +62,7 @@ async function BuscarConteudo({ searchParams }: PageProps<"/buscar">) {
           <input name="max" inputMode="decimal" defaultValue={f.valorMax ?? ""} placeholder="ex.: 80000" />
         </label>
         <button type="submit">Buscar</button>
-      </form>
+      </Form>
 
       <p className="muted small">
         {total.toLocaleString("pt-BR")} {total === 1 ? "edital" : "editais"} {f.abertas ? "com propostas abertas" : ""}.{" "}

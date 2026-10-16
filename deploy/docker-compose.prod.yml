@@ -1,0 +1,47 @@
+# Production stack on the VPS (/opt/radar). Images are built by CI and pulled from GHCR.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: radar
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "radar"]
+      interval: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits: { memory: 384m, cpus: "0.5" }
+
+  jobs:
+    image: ghcr.io/giovaniohira/radar-licitacoes-jobs:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://radar:${POSTGRES_PASSWORD}@db:5432/radar
+    depends_on:
+      db: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: 256m, cpus: "0.5" }
+
+  web:
+    image: ghcr.io/giovaniohira/radar-licitacoes-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://radar:${POSTGRES_PASSWORD}@db:5432/radar
+    depends_on:
+      db: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:3200:3000"
+    deploy:
+      resources:
+        limits: { memory: 384m, cpus: "0.5" }
+
+volumes:
+  pgdata:
