@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: radar
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "radar"]
+      interval: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits: { memory: 384m }
+
+  jobs:
+    build: { context: ., target: jobs }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://radar:${POSTGRES_PASSWORD}@db:5432/radar
+    depends_on:
+      db: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: 256m }
+
+  web:
+    build: { context: ., target: web }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://radar:${POSTGRES_PASSWORD}@db:5432/radar
+    depends_on:
+      db: { condition: service_healthy }
+    # Only nginx on the host talks to it.
+    ports:
+      - "127.0.0.1:3200:3000"
+    deploy:
+      resources:
+        limits: { memory: 384m }
+
+volumes:
+  pgdata:

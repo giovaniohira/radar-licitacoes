@@ -1,0 +1,48 @@
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+
+export const SESSION_COOKIE = "radar_sessao";
+export const SESSION_DAYS = 30;
+export const LOGIN_TOKEN_MINUTES = 20;
+
+function secret(): string {
+  const s = process.env.SESSION_SECRET;
+  if (!s || s.length < 32) throw new Error("SESSION_SECRET precisa ter 32+ caracteres");
+  return s;
+}
+
+function hmac(data: string, key = secret()): string {
+  return createHmac("sha256", key).update(data).digest("base64url");
+}
+
+/** Session value: "<userId>.<expiresEpochSec>.<hmac>". Stateless; rotating SESSION_SECRET logs everyone out. */
+export function signSession(userId: number, now = Date.now(), key?: string): string {
+  const exp = Math.floor(now / 1000) + SESSION_DAYS * 86400;
+  const body = `${userId}.${exp}`;
+  return `${body}.${hmac(body, key)}`;
+}
+
+export function verifySession(value: string | undefined, now = Date.now(), key?: string): number | null {
+  if (!value) return null;
+  const [uid, exp, sig] = value.split(".");
+  if (!uid || !exp || !sig) return null;
+  const expected = Buffer.from(hmac(`${uid}.${exp}`, key));
+  const got = Buffer.from(sig);
+  if (expected.length !== got.length || !timingSafeEqual(expected, got)) return null;
+  if (Number(exp) * 1000 < now) return null;
+  const id = Number(uid);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+export function newLoginToken(): { token: string; hash: string } {
+  const token = randomBytes(32).toString("base64url");
+  return { token, hash: hashToken(token) };
+}
+
+export function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function normalizeEmail(email: string): string | null {
+  const e = email.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254 ? e : null;
+}
