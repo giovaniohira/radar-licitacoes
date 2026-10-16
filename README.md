@@ -57,7 +57,15 @@ São 33 testes: unitários (normalização com dados reais do PNCP, retry, SQL p
 
 ## Deploy
 
-`docker compose up -d` sobe `db`, `jobs` (migra e agenda) e `web` (Next standalone em `127.0.0.1:3200`, atrás do nginx). O conjunto usa cerca de 170 MB de RAM.
+Produção: **https://apps.giovaniohira.com/radar**
+
+Todo push na `main` roda o CI (tipos, lint, testes com Postgres e build). Se passar, o job `deploy`:
+
+1. builda as imagens `web` (com `BASE_PATH=/radar`) e `jobs` e publica no GHCR com a tag do commit;
+2. copia [`deploy/docker-compose.prod.yml`](deploy/docker-compose.prod.yml) para `/opt/radar` na VPS via SSH, com um usuário dedicado `radar`;
+3. faz `docker compose pull && up -d` e um smoke test em `127.0.0.1:3200/radar`. Se o smoke test falhar, o job falha e mostra os logs.
+
+O nginx do host atende `/radar` com o snippet [`deploy/nginx-location.conf`](deploy/nginx-location.conf). Os segredos (`POSTGRES_PASSWORD`, `SESSION_SECRET`, SMTP e chave da Anthropic) ficam só em `/opt/radar/.env` na VPS. O conjunto usa cerca de 170 MB de RAM e tem limite de CPU por container.
 
 ## Monetização (planejada)
 
