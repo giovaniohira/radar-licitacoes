@@ -3,11 +3,14 @@ import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePool, pool } from "@/lib/db";
 import { matchesForAlert, sendDigests, type Alert } from "@/lib/alerts";
-import { ingestDia, upsertContratacoes } from "@/lib/ingest";
-import type { PncpContratacao, PncpPage } from "@/lib/pncp";
+import { ingestDia, upsertContratacoes, upsertContratos } from "@/lib/ingest";
+import { analisar, contratosRecentes } from "@/lib/mercado";
+import { addToPipeline, listPipeline, moveCard } from "@/lib/pipeline";
+import type { PncpContratacao, PncpContrato, PncpPage } from "@/lib/pncp";
 import { buildSearch, type EditalResumo } from "@/lib/search";
 
 const url = process.env.TEST_DATABASE_URL;
+const contratos = JSON.parse(readFileSync(new URL("./fixtures/contratos.json", import.meta.url), "utf8")) as PncpContrato[];
 const page = JSON.parse(readFileSync(new URL("./fixtures/publicacao.json", import.meta.url), "utf8")) as PncpPage<PncpContratacao>;
 
 // Push every deadline into the future so the "open only" filter keeps them.
@@ -81,5 +84,54 @@ describe.skipIf(!url)("database", () => {
     expect(await sendDigests(db, "https://radar.test")).toBe(1);
     expect(await matchesForAlert(db, alert)).toHaveLength(0);
     expect(await sendDigests(db, "https://radar.test")).toBe(0);
+  });
+
+  it("never mails the shared demo account", async () => {
+    const db = pool();
+    const [{ id }] = (await db.query(`insert into users (email, demo) values ('demo@radar.local', true) returning id`)).rows;
+    await db.query(`insert into alerts (user_id, nome, palavras) values ($1, 'demo', $2)`, [id, fixture[0].objetoCompra.split(/\s+/)[0]]);
+    expect(await sendDigests(db, "https://radar.test")).toBe(0);
+  });
+
+  it("keeps pipeline order and seeds the checklist from the AI summary", async () => {
+    const db = pool();
+    const [{ id: userId }] = (await db.query(`insert into users (email) values ('p@b.com') returning id`)).rows;
+    const [a, b, c] = fixture.map((f) => f.numeroControlePNCP);
+    await db.query(`insert into resumos (edital_id, documento, dados, modelo) values ($1, 'x.pdf', $2, 'm')`, [
+      a,
+      JSON.stringify({ exigencias_habilitacao: ["CND federal", "Atestado técnico"] }),
+    ]);
+    for (const id of [a, b, c]) await addToPipeline(db, userId, id);
+    await addToPipeline(db, userId, a); // second add is a no-op
+    let itens = await listPipeline(db, userId);
+    expect(itens.map((i) => i.edital_id)).toEqual([a, b, c]);
+    expect(itens.find((i) => i.edital_id === a)).toMatchObject({ check_total: 2, check_feito: 0 });
+
+    await moveCard(db, userId, c, "analise", [c]);
+    await moveCard(db, userId, a, "analise", [a, c]);
+    itens = await listPipeline(db, userId);
+    const analise = itens.filter((i) => i.etapa === "analise").map((i) => i.edital_id);
+    expect(analise).toEqual([a, c]);
+    expect(itens.filter((i) => i.etapa === "triagem").map((i) => i.edital_id)).toEqual([b]);
+
+    // Another user's card is out of reach.
+    await moveCard(db, userId + 999, b, "ganha", [b]);
+    expect((await listPipeline(db, userId)).find((i) => i.edital_id === b)?.etapa).toBe("triagem");
+  });
+
+  it("upserts contracts and answers market questions", async () => {
+    const db = pool();
+    const recent = contratos.map((c) => ({ ...c, dataPublicacaoPncp: new Date().toISOString().slice(0, 19) }));
+    expect(await upsertContratos(db, recent)).toEqual({ inseridos: recent.length, atualizados: 0 });
+    expect(await upsertContratos(db, recent)).toEqual({ inseridos: 0, atualizados: 0 });
+    const [{ raw }] = (await db.query(`select raw from contratos where tipo_pessoa = 'PF'`)).rows;
+    expect(raw.niFornecedor).toBeNull();
+
+    const m = await analisar(db, { dias: 30 });
+    expect(m.totais.contratos).toBe(recent.length);
+    expect(m.fornecedores.every((f) => /^\d{14}$/.test(f.id))).toBe(true);
+    expect(m.serie.reduce((n, p) => n + p.n, 0)).toBe(recent.length);
+    const rows = await contratosRecentes(db, { orgao: recent[0].orgaoEntidade.cnpj, dias: 30 });
+    expect(rows.every((r) => r.orgao_cnpj === recent[0].orgaoEntidade.cnpj)).toBe(true);
   });
 });
