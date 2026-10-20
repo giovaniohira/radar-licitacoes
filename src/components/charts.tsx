@@ -33,9 +33,9 @@ export function HBars({
 
 /** Vertical bars over time (weekly). Pure SVG: scales with its container, colors come from CSS tokens. */
 export function Bars({ points, metric = "valor" }: { points: { semana: string; n: number; valor: number }[]; metric?: "valor" | "n" }) {
-  const W = 640;
-  const H = 180;
-  const pad = { l: 44, r: 8, t: 8, b: 22 };
+  const W = 1000;
+  const H = 240;
+  const pad = { l: 72, r: 8, t: 10, b: 24 };
   const max = Math.max(1, ...points.map((p) => p[metric]));
   const bw = (W - pad.l - pad.r) / Math.max(points.length, 1);
   const y = (v: number) => pad.t + (H - pad.t - pad.b) * (1 - v / max);

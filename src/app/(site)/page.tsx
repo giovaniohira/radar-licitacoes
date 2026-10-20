@@ -131,7 +131,7 @@ export default function Home() {
       </section>
 
       <section className="section container">
-        <div className="grid g4">
+        <div className="grid g4 pillars">
           {PILARES.map((p) => (
             <div key={p.titulo} className="card pillar">
               <span className="icon">
