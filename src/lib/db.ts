@@ -1,4 +1,7 @@
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, types, type QueryResultRow } from "pg";
+
+// Keep SQL `date` as "YYYY-MM-DD": the default parser builds a Date at local midnight, which shifts the day across timezones.
+types.setTypeParser(1082, (v) => v);
 
 declare global {
   var __radarPool: Pool | undefined;

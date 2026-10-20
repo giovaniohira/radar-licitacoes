@@ -1,11 +1,14 @@
-// Long-running job runner for the `jobs` container: no cron daemon needed.
-// Ingests at 06:00, 12:00 and 18:00 and sends digests at 07:00 (Brasília).
+// Long-running job runner for the `jobs` container: no cron daemon needed. Hours are Brasília time.
+// 04h reseed the demo account · 06h/12h/18h ingest editais · 06h ingest contracts · 07h send digests.
 import { closePool, pool } from "../src/lib/db";
 import { sendDigests } from "../src/lib/alerts";
-import { hojeBR, ingestDia } from "../src/lib/ingest";
+import { seedDemo } from "../src/lib/demo";
+import { hojeBR, ingestContratosDia, ingestDia } from "../src/lib/ingest";
 
 const INGEST_HOURS = [6, 12, 18];
+const CONTRATOS_HOUR = 6;
 const DIGEST_HOUR = 7;
+const DEMO_HOUR = 4;
 const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
 function brHour(now = new Date()) {
@@ -15,30 +18,43 @@ function brHour(now = new Date()) {
 let running = false;
 let lastSlot = "";
 
+async function step(nome: string, fn: () => Promise<string>) {
+  try {
+    console.log(`[${new Date().toISOString()}] ${nome}: ${await fn()}`);
+  } catch (err) {
+    // One failing job (PNCP down, SMTP down) must not skip the others in the same slot.
+    console.error(`[${new Date().toISOString()}] ${nome} falhou`, err);
+  }
+}
+
 async function tick() {
   const now = new Date();
   const hour = brHour(now);
   const slot = `${hojeBR(0, now)}T${hour}`;
   if (running || slot === lastSlot) return;
-  const doIngest = INGEST_HOURS.includes(hour);
-  const doDigest = hour === DIGEST_HOUR;
-  if (!doIngest && !doDigest) return;
   running = true;
   lastSlot = slot;
   try {
-    if (doIngest) {
-      // Yesterday too: late publications and updates land after midnight.
-      for (const dia of [hojeBR(-1, now), hojeBR(0, now)]) {
-        const r = await ingestDia(pool(), dia);
-        console.log(`[${now.toISOString()}] ingest ${dia}: ${r.registros} lidos, ${r.inseridos} novos, ${r.atualizados} atualizados`);
+    // Yesterday too: late publications and updates land after midnight.
+    const diasAlvo = [hojeBR(-1, now), hojeBR(0, now)];
+    if (hour === DEMO_HOUR) await step("demo", async () => `usuário ${await seedDemo(pool())}`);
+    if (INGEST_HOURS.includes(hour)) {
+      for (const dia of diasAlvo) {
+        await step(`editais ${dia}`, async () => {
+          const r = await ingestDia(pool(), dia);
+          return `${r.registros} lidos, ${r.inseridos} novos, ${r.atualizados} atualizados`;
+        });
       }
     }
-    if (doDigest) {
-      const n = await sendDigests(pool(), appUrl, (m) => console.log(`  ${m}`));
-      console.log(`[${now.toISOString()}] digests: ${n} e-mails`);
+    if (hour === CONTRATOS_HOUR) {
+      for (const dia of diasAlvo) {
+        await step(`contratos ${dia}`, async () => {
+          const r = await ingestContratosDia(pool(), dia);
+          return `${r.registros} lidos, ${r.inseridos} novos`;
+        });
+      }
     }
-  } catch (err) {
-    console.error(`[${now.toISOString()}] job falhou`, err);
+    if (hour === DIGEST_HOUR) await step("digests", async () => `${await sendDigests(pool(), appUrl)} e-mails`);
   } finally {
     running = false;
   }
