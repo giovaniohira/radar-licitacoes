@@ -6,7 +6,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/painel-dark.png">
-  <img alt="Visão geral: novos editais dos alertas e prazos da semana" src="docs/painel.png">
+  <img alt="Hoje: editais novos dos alertas com triagem na linha e os prazos da semana" src="docs/painel.png">
 </picture>
 
 ## O que faz
@@ -84,6 +84,14 @@ TEST_DATABASE_URL=postgres://radar:radar@localhost:5544/radar_test npm test
 ## Deploy
 
 Todo push na `main` que passa no CI builda as imagens `web` e `jobs`, publica no GHCR e faz `docker compose up -d` na VPS em `/opt/radar` com um usuário dedicado, seguido de smoke test. O nginx do host serve `/radar` com o snippet em [`deploy/nginx-location.conf`](deploy/nginx-location.conf). Segredos ficam só no `.env` da VPS.
+
+Fluxo do dia a dia:
+
+1. Abra um PR. O CI roda typecheck, lint, testes (com Postgres) e `next build`.
+2. Faça o merge. O mesmo workflow builda as imagens marcadas com o SHA do commit, implanta na VPS, testa a porta do container e depois a URL pública. O deploy aparece no ambiente `production` do GitHub, com link para o app.
+3. Para voltar uma versão: **Actions → CI → Run workflow** na `main`, com o SHA de um deploy anterior em `tag`. O job pula testes e build e implanta a imagem que já está no GHCR. Com `tag` vazio, reimplanta a `main` atual.
+
+As imagens antigas deste app são apagadas da VPS a cada deploy; as do GHCR ficam, e é delas que o rollback depende.
 
 ---
 
