@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hashToken, icsToken, newLoginToken, normalizeEmail, signSession, verifyIcsToken, verifySession } from "@/lib/auth";
 import { renderDigest, type Alert } from "@/lib/alerts";
-import { formatBRL, formatDia, frase, nome, prazo, prazoTom } from "@/lib/format";
+import { destacar, formatBRL, formatDia, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
 import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
@@ -148,9 +148,9 @@ describe("PNCP text casing", () => {
 describe("deadline tone and dates", () => {
   const now = new Date("2026-10-16T12:00:00Z");
   it("grades urgency", () => {
-    expect(prazoTom("2026-10-17T12:00:00Z", now)).toBe("danger");
-    expect(prazoTom("2026-10-21T12:00:00Z", now)).toBe("warn");
-    expect(prazoTom("2026-11-30T12:00:00Z", now)).toBe("ok");
+    expect(prazoTom("2026-10-17T12:00:00Z", now)).toBe("warn");
+    expect(prazoTom("2026-10-19T18:00:00Z", now)).toBe("warn"); // "em 3 dias"
+    expect(prazoTom("2026-10-21T12:00:00Z", now)).toBe("neutral");
     expect(prazoTom("2026-10-01T12:00:00Z", now)).toBe("neutral");
   });
   it("never shifts a SQL date across timezones", () => {
@@ -217,5 +217,47 @@ describe("pipeline helpers", () => {
     expect(verifyIcsToken(7, icsToken(7, KEY), KEY)).toBe(true);
     expect(verifyIcsToken(8, icsToken(7, KEY), KEY)).toBe(false);
     expect(verifyIcsToken(7, "short", KEY)).toBe(false);
+  });
+});
+
+describe("tituloCurto", () => {
+  it("drops PNCP boilerplate openings and tails", () => {
+    expect(
+      tituloCurto(
+        "A presente licitação tem como objeto a seleção da proposta mais vantajosa para a contratação de empresa especializada para a prestação de serviços de manutenção preventiva e corretiva",
+      ),
+    ).toBe("Serviços de manutenção preventiva e corretiva");
+    expect(
+      tituloCurto(
+        "O presente instrumento tem como objetivo a contratação de Empresa Especializada para Aquisição de Computadores All In One e Notebook, que serão destinados a Secretaria Municipal de Cultura",
+      ),
+    ).toBe("Computadores All In One e Notebook");
+    expect(tituloCurto("[Portal de Compras Públicas] - Aquisição de computadores e de infraestrutura completa")).toBe(
+      "Computadores e de infraestrutura completa",
+    );
+    expect(
+      tituloCurto(
+        "Implantação de Registro de preços para futura e eventual aquisição de equipamentos de informática, computadores, notebooks, destinados ao atendimento das secretarias",
+      ),
+    ).toBe("Equipamentos de informática, computadores, notebooks");
+    expect(tituloCurto("Despesa referente a contratação de serviço especializado para reparo de fonte de alimentação de notebook")).toBe(
+      "Reparo de fonte de alimentação de notebook",
+    );
+    expect(tituloCurto("O objeto da presente licitação é a contratação de solução de tecnologia")).toBe("Solução de tecnologia");
+    expect(tituloCurto("Aquisição de Memória Kingston DDR4 8GB 3200MHz, através de dispensa de licitação")).toBe("Memória Kingston DDR4 8GB 3200MHz");
+  });
+  it("leaves plain objects alone and caps the length", () => {
+    expect(tituloCurto("Locação de 10 (dez) equipamentos do tipo tablet")).toBe("Locação de 10 (dez) equipamentos do tipo tablet");
+    expect(tituloCurto("Aquisição de pneus")).toBe("Pneus");
+    expect(tituloCurto("Aquisição de")).toBe("Aquisição de");
+    expect(tituloCurto("palavra ".repeat(30)).length).toBeLessThanOrEqual(81);
+  });
+});
+
+describe("destacar", () => {
+  it("finds the first alert term ignoring accents and case", () => {
+    expect(destacar("Aquisição de Computadores e notebooks", "notebook, computador")).toEqual(["Aquisição de ", "Computador", "es e notebooks"]);
+    expect(destacar("Serviço de manutenção", "manutencao -predial")).toEqual(["Serviço de ", "manutenção", ""]);
+    expect(destacar("Pneus", "notebook")).toBeNull();
   });
 });

@@ -11,6 +11,9 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
             <Logo />
           </Link>
           <nav>
+            <Link className="btn btn-ghost hide-sm" href="/#como">
+              Como funciona
+            </Link>
             <Link className="btn btn-ghost hide-sm" href="/buscar">
               Buscar editais
             </Link>
@@ -21,7 +24,7 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
               Entrar
             </Link>
             <form action={entrarDemo}>
-              <button className="btn btn-primary">Ver demo</button>
+              <button className="btn btn-primary">Ver a demo</button>
             </form>
           </nav>
         </div>

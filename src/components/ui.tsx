@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { formatBRL, formatData, frase, local, nome, prazo, prazoTom } from "@/lib/format";
+import { destacar, dobra, formatBRL, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { Icon } from "./icons";
 
 export function PrazoBadge({ d }: { d: Date | string | null }) {
   const tom = prazoTom(d);
@@ -56,25 +57,74 @@ export interface EditalLinha {
 
 export const editalHref = (id: string) => `/edital/${encodeURIComponent(id)}`;
 
-/** One tender in a result list: object, buyer, place, value and deadline. */
-export function EditalItem({ e, extra }: { e: EditalLinha; extra?: ReactNode }) {
+/** One tender in a result list: short title, original object, buyer, value, deadline and optional row actions. */
+export function EditalItem({
+  e,
+  extra,
+  termos,
+  acoes,
+  apagado,
+}: {
+  e: EditalLinha;
+  extra?: ReactNode;
+  /** Alert or search keywords; the first match in the original object is highlighted. */
+  termos?: string;
+  acoes?: ReactNode;
+  apagado?: boolean;
+}) {
+  const objeto = frase(e.objeto);
+  const titulo = tituloCurto(objeto);
+  const hit = termos ? destacar(objeto, termos) : null;
+  const orgao = nome(e.orgao);
+  // "Município de Cairu · Cairu · BA" names the city twice.
+  const lugar = e.municipio && dobra(orgao).includes(dobra(nome(e.municipio))) ? e.uf : local(e.municipio, e.uf);
+  const valor = formatBRL(e.valor_estimado);
+  const urgente = prazoTom(e.encerramento) === "warn";
   return (
-    <div className="result">
-      <div style={{ minWidth: 0 }}>
+    <div className={`result${apagado ? " apagado" : ""}`}>
+      <div className="body">
         <Link href={editalHref(e.id)} className="title clamp2">
-          {frase(e.objeto)}
+          {titulo}
         </Link>
+        {titulo !== objeto && (
+          <p className="orig" title={objeto}>
+            {hit ? (
+              <>
+                {hit[0]}
+                <mark className="hl">{hit[1]}</mark>
+                {hit[2]}
+              </>
+            ) : (
+              objeto
+            )}
+          </p>
+        )}
         <div className="meta">
-          <span>{nome(e.orgao)}</span>
-          <span>{local(e.municipio, e.uf)}</span>
+          <span>{orgao}</span>
+          {lugar && <span>{lugar}</span>}
           {e.modalidade && <span>{e.modalidade}</span>}
           {extra}
         </div>
       </div>
       <div className="side">
-        <span className="valor">{formatBRL(e.valor_estimado)}</span>
-        <PrazoBadge d={e.encerramento} />
-        {e.encerramento && <span className="xs subtle num">{formatData(e.encerramento)}</span>}
+        <div className="cell">
+          <span className={`valor${valor === "Sigiloso" ? " sigiloso" : ""}`}>{valor}</span>
+          <span className="xs subtle">valor estimado</span>
+        </div>
+        <div className="cell">
+          {e.encerramento ? (
+            <>
+              <span className={`quando${urgente ? " urgente" : ""}`}>
+                {urgente && <Icon name="clock" size={14} />}
+                {prazo(e.encerramento)}
+              </span>
+              <span className="xs subtle num">{formatData(e.encerramento)}</span>
+            </>
+          ) : (
+            <span className="quando sem">Sem prazo</span>
+          )}
+        </div>
+        {acoes && <div className="acoes">{acoes}</div>}
       </div>
     </div>
   );

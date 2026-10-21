@@ -1,18 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Suspense, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { Icon, Logo, type IconName } from "./icons";
 
 const NAV: { href: string; label: string; icon: IconName }[] = [
-  { href: "/painel", label: "Visão geral", icon: "home" },
+  { href: "/painel", label: "Hoje", icon: "home" },
   { href: "/buscar", label: "Buscar editais", icon: "search" },
   { href: "/pipeline", label: "Pipeline", icon: "kanban" },
   { href: "/alertas", label: "Alertas", icon: "bell" },
+  { href: "/mercado", label: "Mercado", icon: "chart" },
 ];
-
-const INTEL: { href: string; label: string; icon: IconName }[] = [{ href: "/mercado", label: "Mercado", icon: "chart" }];
 
 function NavItem({ href, label, icon, path }: { href: string; label: string; icon: IconName; path: string }) {
   const active = path === href || path.startsWith(`${href}/`);
@@ -30,10 +29,6 @@ function Nav({ path }: { path: string }) {
       {NAV.map((n) => (
         <NavItem key={n.href} {...n} path={path} />
       ))}
-      <div className="nav-label">Inteligência</div>
-      {INTEL.map((n) => (
-        <NavItem key={n.href} {...n} path={path} />
-      ))}
     </>
   );
 }
@@ -45,6 +40,19 @@ function ActiveNav() {
 
 export function Shell({ user, children }: { user: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+
+  // Ctrl/Cmd+K jumps to search from anywhere in the app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        router.push("/buscar");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
 
   return (
     <div className={`app${open ? " nav-open" : ""}`}>
@@ -52,6 +60,11 @@ export function Shell({ user, children }: { user: ReactNode; children: ReactNode
       <aside className="sidebar" onClick={(e) => (e.target as HTMLElement).closest("a") && setOpen(false)}>
         <Link href="/">
           <Logo />
+        </Link>
+        <Link href="/buscar" className="cmdk">
+          <Icon name="search" />
+          <span>Buscar editais</span>
+          <kbd>Ctrl K</kbd>
         </Link>
         <Suspense fallback={<Nav path="" />}>
           <ActiveNav />

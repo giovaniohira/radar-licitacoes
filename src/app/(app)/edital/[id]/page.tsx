@@ -4,9 +4,11 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { EditalItem, Loading, PageHead, PrazoBadge, Stat, type EditalLinha } from "@/components/ui";
+import { AutoSelect } from "@/components/AutoSelect";
+import { SubmitButton } from "@/components/SubmitButton";
+import { EditalItem, Loading, type EditalLinha } from "@/components/ui";
 import { query } from "@/lib/db";
-import { formatBRL, formatCNPJ, formatData, frase, local, nome } from "@/lib/format";
+import { formatBRL, formatCNPJ, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { fetchArquivos, pncpUrl, type EditalRow } from "@/lib/pncp";
 import { ETAPAS } from "@/lib/pipeline";
 import { currentUser } from "@/lib/session";
@@ -47,7 +49,7 @@ async function MaisDoOrgao({ e }: { e: Edital }) {
      from editais where cnpj = $1 and id <> $2 and encerramento > now() order by encerramento limit 4`,
     [e.cnpj, e.id],
   );
-  if (!rows.length) return <div className="card-body small muted">Nenhum outro edital aberto deste órgão.</div>;
+  if (!rows.length) return <div className="card-body small muted">Este órgão não tem outros editais abertos agora.</div>;
   return rows.map((r) => <EditalItem key={r.id} e={r} />);
 }
 
@@ -55,8 +57,8 @@ async function PipelineAcoes({ e }: { e: Edital }) {
   const user = await currentUser();
   if (!user) {
     return (
-      <Link className="btn btn-primary" href="/entrar">
-        <Icon name="plus" size={14} /> Adicionar ao pipeline
+      <Link className="btn" href="/entrar">
+        <Icon name="plus" size={14} /> Acompanhar no pipeline
       </Link>
     );
   }
@@ -65,26 +67,36 @@ async function PipelineAcoes({ e }: { e: Edital }) {
     return (
       <form action={adicionarAoPipeline}>
         <input type="hidden" name="edital" value={e.id} />
-        <button className="btn btn-primary">
-          <Icon name="plus" size={14} /> Adicionar ao pipeline
-        </button>
+        <SubmitButton className="btn" style={{ width: "100%" }}>
+          <Icon name="plus" size={14} /> Acompanhar no pipeline
+        </SubmitButton>
       </form>
     );
   }
   return (
-    <form action={mudarEtapa} className="row" style={{ flexWrap: "nowrap" }}>
+    <form action={mudarEtapa} className="field">
+      <span>Etapa no pipeline</span>
       <input type="hidden" name="edital" value={e.id} />
-      <select className="input" name="etapa" defaultValue={p.etapa} aria-label="Etapa no pipeline" style={{ width: "auto" }}>
-        {ETAPAS.map((x) => (
-          <option key={x.id} value={x.id}>
-            {x.label}
-          </option>
-        ))}
-      </select>
-      <button className="btn">Mover</button>
-      <button className="btn btn-ghost btn-danger" formAction={removerDoPipeline} title="Remover do pipeline" aria-label="Remover do pipeline">
-        <Icon name="trash" size={14} />
-      </button>
+      <div className="row" style={{ flexWrap: "nowrap" }}>
+        {/* Keyed by stage: React resets the form after the action, and the reset must land on the saved value. */}
+        <AutoSelect key={p.etapa} className="input" name="etapa" defaultValue={p.etapa} aria-label="Etapa no pipeline">
+          {ETAPAS.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.label}
+            </option>
+          ))}
+        </AutoSelect>
+        <details className="menu">
+          <summary className="btn btn-icon" aria-label="Mais ações" title="Mais ações">
+            ⋯
+          </summary>
+          <div className="menu-pop">
+            <button className="btn btn-ghost btn-danger" formAction={removerDoPipeline}>
+              <Icon name="trash" size={14} /> Remover do pipeline
+            </button>
+          </div>
+        </details>
+      </div>
     </form>
   );
 }
@@ -96,7 +108,7 @@ async function ResumoBloco({ e }: { e: Edital }) {
   ]);
   if (!user && !resumo) {
     return (
-      <div className="card card-body stack">
+      <div className="card card-body stack resumo-cta">
         <p className="muted">A IA lê o PDF do edital e extrai prazos, habilitação, exclusividade ME/EPP e pontos de atenção.</p>
         <div>
           <Link className="btn btn-primary" href="/entrar">
@@ -115,47 +127,79 @@ async function Edital({ params }: PageProps<"/edital/[id]">) {
   const [e] = await query<Edital>(`select * from editais where id = $1`, [id]);
   if (!e) notFound();
 
+  const objeto = frase(e.objeto);
+  const titulo = tituloCurto(objeto);
   return (
     <div className="page">
-      <PageHead
-        crumbs={
-          <>
-            <Link href="/buscar">Buscar</Link>/<Link href={`/orgao/${e.cnpj}`}>{nome(e.orgao)}</Link>
-          </>
-        }
-        title={frase(e.objeto)}
-        sub={
-          <>
+      <nav className="crumbs" aria-label="Você está em">
+        <Link href="/buscar">Buscar</Link>/<Link href={`/orgao/${e.cnpj}`}>{nome(e.orgao)}</Link>
+      </nav>
+      <header className="edital-head">
+        <div className="stack" style={{ gap: 10, minWidth: 0 }}>
+          <div className="row" style={{ gap: 6 }}>
+            {e.modalidade && <span className="tag outline">{e.modalidade}</span>}
+            {e.srp && <span className="tag outline">Registro de preços</span>}
+            {e.esfera && ESFERA[e.esfera] && <span className="tag outline">{ESFERA[e.esfera]}</span>}
+          </div>
+          <h1>{titulo}</h1>
+          {titulo !== objeto && (
+            <p className="clamp2 subtle" title={objeto} style={{ maxWidth: 780 }}>
+              {objeto}
+            </p>
+          )}
+          <p className="small muted">
+            <Icon name="building" size={14} />{" "}
             <Link className="link" href={`/orgao/${e.cnpj}`}>
               {nome(e.orgao)}
             </Link>{" "}
-            · {local(e.municipio, e.uf)} · {e.modalidade}
-          </>
-        }
-        actions={
-          <Suspense fallback={<span className="btn" style={{ width: 180 }} />}>
+            · {local(e.municipio, e.uf)}
+          </p>
+        </div>
+        <div className="edital-acoes">
+          <Suspense fallback={<span className="btn" style={{ width: "100%" }} />}>
             <PipelineAcoes e={e} />
           </Suspense>
-        }
-      />
+          <div className="row" style={{ flexWrap: "nowrap" }}>
+            {e.link_origem && (
+              <a className="btn btn-primary" style={{ flex: 1 }} href={e.link_origem} target="_blank" rel="noreferrer">
+                Enviar proposta no portal <Icon name="external" size={14} />
+              </a>
+            )}
+            <a className="btn" style={e.link_origem ? undefined : { flex: 1 }} href={pncpUrl(e)} target="_blank" rel="noreferrer">
+              Ver no PNCP <Icon name="external" size={14} />
+            </a>
+          </div>
+        </div>
+      </header>
 
-      <div className="grid g4" style={{ marginBottom: 20 }}>
-        <Stat label="Valor estimado" value={formatBRL(e.valor_estimado)} hint={e.srp ? "Registro de preços" : undefined} />
-        <Stat label="Propostas até" value={<span style={{ fontSize: 18 }}>{formatData(e.encerramento)}</span>} hint={<PrazoBadge d={e.encerramento} />} />
-        <Stat label="Abertura" value={<span style={{ fontSize: 18 }}>{formatData(e.abertura)}</span>} />
-        <Stat label="Situação" value={<span style={{ fontSize: 18 }}>{e.situacao ?? "—"}</span>} hint={(e.esfera && ESFERA[e.esfera]) ?? undefined} />
-      </div>
+      <section className="card facts" aria-label="Fatos principais">
+        <div>
+          <span>Valor estimado</span>
+          <b>{formatBRL(e.valor_estimado)}</b>
+          <small>{e.srp ? "Registro de preços, por demanda" : "Total estimado"}</small>
+        </div>
+        <div>
+          <span>Propostas até</span>
+          <b>{formatData(e.encerramento)}</b>
+          <small className={prazoTom(e.encerramento) === "warn" ? "urgente" : undefined}>{prazo(e.encerramento)}</small>
+        </div>
+        <div>
+          <span>Abertura</span>
+          <b>{formatData(e.abertura)}</b>
+          <small>Publicado no PNCP em {formatData(e.publicado_em)}</small>
+        </div>
+        <div>
+          <span>Situação</span>
+          <b>{e.situacao ?? "—"}</b>
+          <small>{(e.esfera && ESFERA[e.esfera]) ?? "—"}</small>
+        </div>
+      </section>
 
       <div className="grid cols-main">
         <div className="stack-lg">
-          <section className="stack">
-            <h2 className="row">
-              <Icon name="sparkles" /> Resumo do edital por IA
-            </h2>
-            <Suspense fallback={<div className="card card-body muted">Carregando…</div>}>
-              <ResumoBloco e={e} />
-            </Suspense>
-          </section>
+          <Suspense fallback={<div className="card card-body muted">Carregando o resumo…</div>}>
+            <ResumoBloco e={e} />
+          </Suspense>
           <section className="card">
             <div className="card-head">
               <h2>Detalhes</h2>
@@ -163,7 +207,7 @@ async function Edital({ params }: PageProps<"/edital/[id]">) {
             <div className="card-body">
               <dl className="kv">
                 <dt>Objeto completo</dt>
-                <dd>{frase(e.objeto)}</dd>
+                <dd>{objeto}</dd>
                 {e.info_complementar && (
                   <>
                     <dt>Informação complementar</dt>
@@ -174,8 +218,6 @@ async function Edital({ params }: PageProps<"/edital/[id]">) {
                 <dd>{nome(e.unidade ?? e.orgao)}</dd>
                 <dt>CNPJ do órgão</dt>
                 <dd className="num">{formatCNPJ(e.cnpj)}</dd>
-                <dt>Publicado no PNCP</dt>
-                <dd>{formatData(e.publicado_em)}</dd>
                 <dt>Nº de controle</dt>
                 <dd className="mono">{e.id}</dd>
               </dl>
@@ -183,37 +225,18 @@ async function Edital({ params }: PageProps<"/edital/[id]">) {
           </section>
         </div>
 
-        <aside className="stack-lg">
+        <aside className="rail">
           <section className="card">
-            <div className="card-head">
-              <h2>Onde participar</h2>
-            </div>
-            <div className="card-body stack">
-              {e.link_origem && (
-                <a className="btn btn-primary" href={e.link_origem} target="_blank" rel="noreferrer">
-                  Sistema de origem (enviar proposta) <Icon name="external" size={14} />
-                </a>
-              )}
-              <a className="btn" href={pncpUrl(e)} target="_blank" rel="noreferrer">
-                Ver no PNCP <Icon name="external" size={14} />
-              </a>
-            </div>
+            <h2>Arquivos</h2>
+            <Suspense fallback={<p className="small muted">Consultando o PNCP…</p>}>
+              <Documentos e={e} />
+            </Suspense>
           </section>
-          <section className="card">
-            <div className="card-head">
-              <h2>Documentos</h2>
-            </div>
-            <div className="card-body">
-              <Suspense fallback={<p className="small muted">Consultando o PNCP…</p>}>
-                <Documentos e={e} />
-              </Suspense>
-            </div>
-          </section>
-          <section className="card">
+          <section className="card" style={{ padding: 0, gap: 0 }}>
             <div className="card-head">
               <h2>Mais deste órgão</h2>
-              <Link className="btn btn-sm" href={`/orgao/${e.cnpj}`}>
-                Perfil
+              <Link className="link small" href={`/orgao/${e.cnpj}`}>
+                Ver perfil
               </Link>
             </div>
             <Suspense fallback={<div className="card-body small muted">Carregando…</div>}>

@@ -15,17 +15,29 @@ async function UserBox() {
     );
   }
   return (
-    <div className="user-box">
-      <span className="avatar">{user.email[0]}</span>
-      <span className="email" title={user.email}>
-        {user.demo ? "Conta demo" : user.email}
-      </span>
-      <form action={sair} style={{ marginLeft: "auto" }}>
-        <button className="btn btn-ghost btn-sm" aria-label="Sair" title="Sair">
-          <Icon name="logout" size={14} />
-        </button>
-      </form>
-    </div>
+    <>
+      {user.demo && (
+        <div className="demo-box">
+          <p>
+            <b>Você está na demo.</b> Os dados voltam ao início todo dia às 4h.
+          </p>
+          <Link href="/entrar" className="btn btn-sm">
+            Criar minha conta
+          </Link>
+        </div>
+      )}
+      <div className="user-box">
+        <span className="avatar">{user.email[0]}</span>
+        <span className="email" title={user.email}>
+          {user.demo ? "Conta demo" : user.email}
+        </span>
+        <form action={sair} style={{ marginLeft: "auto" }}>
+          <button className="btn btn-ghost btn-sm" aria-label="Sair" title="Sair">
+            <Icon name="logout" size={14} />
+          </button>
+        </form>
+      </div>
+    </>
   );
 }
 
