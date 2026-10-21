@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { hashToken, newLoginToken, normalizeEmail, signSession, verifySession } from "@/lib/auth";
+import { hashToken, icsToken, newLoginToken, normalizeEmail, signSession, verifyIcsToken, verifySession } from "@/lib/auth";
 import { renderDigest, type Alert } from "@/lib/alerts";
-import { formatBRL, prazo } from "@/lib/format";
+import { formatBRL, formatDia, frase, nome, prazo, prazoTom } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
-import { parseFiltros, parseValor } from "@/lib/params";
+import { parseFiltros, parseValor, withParams } from "@/lib/params";
+import { whereContratos } from "@/lib/mercado";
+import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
 
 const KEY = "k".repeat(40);
@@ -89,10 +91,10 @@ describe("format", () => {
     expect(prazo("2026-10-16T17:00:00Z", now)).toBe("hoje, em 5h");
     expect(prazo("2026-10-17T13:00:00Z", now)).toBe("amanhã");
     expect(prazo("2026-10-26T13:00:00Z", now)).toBe("em 10 dias");
-    expect(prazo(null, now)).toBe("prazo não informado");
+    expect(prazo(null, now)).toBe("sem prazo");
   });
   it("treats 0 as secret budget", () => {
-    expect(formatBRL(0)).toBe("valor sigiloso ou não informado");
+    expect(formatBRL(0)).toBe("Sigiloso");
     expect(formatBRL(1234)).toMatch(/1\.234/);
   });
 });
@@ -128,5 +130,92 @@ describe("renderDigest", () => {
     expect(d.html).toContain("Notebooks &amp; &quot;monitores&quot;");
     expect(d.html).toContain("https://radar.test/edital/1-1-000001%2F2026");
     expect(d.text).toContain("em 4 dias");
+  });
+});
+
+describe("PNCP text casing", () => {
+  it("turns ALL-CAPS objects into sentence case, keeping acronyms and UFs", () => {
+    expect(frase("AQUISIÇÃO DE EPI PARA A UBS DE BELÁGUA/MA. EXCLUSIVO ME/EPP")).toBe("Aquisição de EPI para a UBS de belágua/MA. Exclusivo ME/EPP");
+    expect(frase("Já em caixa mista")).toBe("Já em caixa mista");
+    expect(frase("SE NECESSÁRIO")).toBe("Se necessário");
+  });
+  it("title-cases names with lowercase connectors", () => {
+    expect(nome("MUNICIPIO DE SAO MIGUEL DO OESTE")).toBe("Municipio de Sao Miguel do Oeste");
+    expect(nome("TECH SOLUCOES LTDA")).toBe("Tech Solucoes LTDA");
+  });
+});
+
+describe("deadline tone and dates", () => {
+  const now = new Date("2026-10-16T12:00:00Z");
+  it("grades urgency", () => {
+    expect(prazoTom("2026-10-17T12:00:00Z", now)).toBe("danger");
+    expect(prazoTom("2026-10-21T12:00:00Z", now)).toBe("warn");
+    expect(prazoTom("2026-11-30T12:00:00Z", now)).toBe("ok");
+    expect(prazoTom("2026-10-01T12:00:00Z", now)).toBe("neutral");
+  });
+  it("never shifts a SQL date across timezones", () => {
+    expect(formatDia("2026-10-14")).toBe("14/10/2026");
+  });
+});
+
+describe("search options", () => {
+  it("filters by deadline window and orders as asked", () => {
+    const { sql, params } = buildSearch({ prazoDias: 7, ordem: "valor" });
+    expect(sql).toContain("encerramento < now() + make_interval(days => $1)");
+    expect(params[0]).toBe(7);
+    expect(sql).toMatch(/order by valor_estimado desc/);
+  });
+  it("ignores unknown order and out-of-range deadlines", () => {
+    expect(parseFiltros({ ordem: "drop", prazo: "999" })).toMatchObject({ ordem: undefined, prazoDias: null });
+  });
+  it("rewrites query strings", () => {
+    expect(withParams({ q: "pneu", uf: ["PR", "SC"], p: "3" }, { p: "4" })).toBe("?q=pneu&uf=PR&uf=SC&p=4");
+    expect(withParams({ q: "pneu" }, { q: undefined })).toBe("");
+  });
+});
+
+describe("market filters", () => {
+  it("parameterizes user input and drops invalid UFs", () => {
+    const { where, params } = whereContratos({ q: "pneu'; --", uf: "XX'", dias: 30 });
+    expect(where).not.toContain("pneu");
+    expect(where).not.toContain("XX");
+    expect(params).toEqual(["pneu' or --", 30]);
+  });
+});
+
+describe("pipeline helpers", () => {
+  const item = (id: string, etapa: PipelineItem["etapa"], encerramento: string | null) =>
+    ({ edital_id: id, etapa, encerramento: encerramento && new Date(encerramento), objeto: `Objeto ${id}`, orgao: "Prefeitura" }) as PipelineItem;
+
+  it("lists active cards closing this week, soonest first", () => {
+    const now = Date.parse("2026-10-16T12:00:00Z");
+    const itens = [
+      item("a", "analise", "2026-10-20T12:00:00Z"),
+      item("b", "triagem", "2026-10-17T12:00:00Z"),
+      item("c", "enviada", "2026-10-18T12:00:00Z"),
+      item("d", "preparando", "2026-11-30T12:00:00Z"),
+      item("e", "analise", "2026-10-10T12:00:00Z"),
+    ];
+    expect(vencendo(itens, 7, now).map((i) => i.edital_id)).toEqual(["b", "a"]);
+  });
+
+  it("folds iCalendar lines at 75 octets, counting multi-byte characters", () => {
+    const folded = fold(`SUMMARY:${"ação ".repeat(40)}`);
+    for (const line of folded.split("\r\n")) expect(Buffer.byteLength(line)).toBeLessThanOrEqual(75);
+    expect(folded.replace(/\r\n /g, "")).toBe(`SUMMARY:${"ação ".repeat(40)}`);
+  });
+
+  it("renders one escaped event per deadline", () => {
+    const ics = renderIcs("https://radar.test", [item("1-1-000001/2026", "analise", "2026-10-20T13:00:00Z"), item("x", "triagem", null)], new Date("2026-10-16T00:00:00Z"));
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(ics).toContain("DTEND:20261020T130000Z");
+    expect(ics).toContain("https://radar.test/edital/1-1-000001%2F2026");
+    expect(ics.endsWith("END:VCALENDAR\r\n")).toBe(true);
+  });
+
+  it("calendar tokens are per user and unforgeable", () => {
+    expect(verifyIcsToken(7, icsToken(7, KEY), KEY)).toBe(true);
+    expect(verifyIcsToken(8, icsToken(7, KEY), KEY)).toBe(false);
+    expect(verifyIcsToken(7, "short", KEY)).toBe(false);
   });
 });

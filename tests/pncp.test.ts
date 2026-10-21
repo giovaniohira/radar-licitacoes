@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { brDate, getJson, normalize, pickEdital, PncpError, type PncpArquivo, type PncpPage, type PncpContratacao } from "@/lib/pncp";
+import { brDate, getJson, normalize, normalizeContrato, pickEdital, PncpError, type PncpArquivo, type PncpContrato, type PncpPage, type PncpContratacao } from "@/lib/pncp";
+import { sanitizeContrato } from "@/lib/ingest";
 
 const page = JSON.parse(readFileSync(new URL("./fixtures/publicacao.json", import.meta.url), "utf8")) as PncpPage<PncpContratacao>;
 
@@ -95,5 +96,34 @@ describe("getJson", () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response("", { status: 500 }));
     await expect(getJson("http://x", { fetchImpl, retries: 2, ...noSleep })).rejects.toThrow("PNCP 500");
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("contracts", () => {
+  const contratos = JSON.parse(readFileSync(new URL("./fixtures/contratos.json", import.meta.url), "utf8")) as PncpContrato[];
+
+  it("normalizes a real contract", () => {
+    const c = normalizeContrato(contratos[0]);
+    expect(c.id).toBe(contratos[0].numeroControlePNCP);
+    expect(c.compra_id).toBe(contratos[0].numeroControlePncpCompra);
+    expect(c.fornecedor_ni).toMatch(/^\d{14}$/);
+    expect(c.data_assinatura).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(c.valor_global).toBe(contratos[0].valorGlobal);
+  });
+
+  it("keeps individuals anonymous, in columns and in the raw payload", () => {
+    const pf = contratos.find((c) => c.tipoPessoa === "PF")!;
+    const row = normalizeContrato(pf);
+    expect(row.fornecedor_ni).toBeNull();
+    expect(row.fornecedor).toBe("Pessoa física");
+    const raw = sanitizeContrato(pf);
+    expect(raw.niFornecedor).toBeNull();
+    expect(raw.nomeRazaoSocialFornecedor).toBeNull();
+  });
+
+  it("drops impossible dates and values", () => {
+    const c = normalizeContrato({ ...contratos[0], dataVigenciaFim: "7203-07-27", valorGlobal: -10, valorInicial: null });
+    expect(c.vigencia_fim).toBeNull();
+    expect(c.valor_global).toBeNull();
   });
 });

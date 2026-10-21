@@ -188,6 +188,95 @@ export class PncpError extends Error {
   }
 }
 
+export const CONTRATOS_PAGE_SIZE = 500; // /contratos accepts larger pages than /contratacoes
+
+export interface PncpContrato {
+  numeroControlePNCP: string;
+  numeroControlePncpCompra?: string | null;
+  orgaoEntidade: { cnpj: string; razaoSocial: string; esferaId?: string | null };
+  unidadeOrgao?: { ufSigla?: string | null; municipioNome?: string | null } | null;
+  tipoPessoa?: string | null;
+  niFornecedor?: string | null;
+  nomeRazaoSocialFornecedor?: string | null;
+  objetoContrato?: string | null;
+  categoriaProcesso?: { nome?: string | null } | null;
+  tipoContrato?: { nome?: string | null } | null;
+  valorGlobal?: number | null;
+  valorInicial?: number | null;
+  dataAssinatura?: string | null;
+  dataVigenciaInicio?: string | null;
+  dataVigenciaFim?: string | null;
+  dataPublicacaoPncp?: string | null;
+  dataAtualizacaoGlobal?: string | null;
+  dataAtualizacao?: string | null;
+}
+
+export interface ContratoRow {
+  id: string;
+  compra_id: string | null;
+  orgao_cnpj: string;
+  orgao: string;
+  esfera: string | null;
+  uf: string | null;
+  municipio: string | null;
+  fornecedor_ni: string | null;
+  fornecedor: string | null;
+  tipo_pessoa: string | null;
+  objeto: string;
+  categoria: string | null;
+  tipo_contrato: string | null;
+  valor_global: number | null;
+  data_assinatura: string | null;
+  vigencia_inicio: string | null;
+  vigencia_fim: string | null;
+  publicado_em: string | null;
+  atualizado_em: string | null;
+}
+
+/** "2026-10-14" stays a date; anything unparseable (PNCP has years like 7203) becomes null. */
+function isoDay(v: string | null | undefined): string | null {
+  const m = v?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  return y >= 2000 && y <= 2100 ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+/** Individuals (PF) are kept anonymous: no CPF and no name, and they never appear in supplier rankings. */
+export function normalizeContrato(c: PncpContrato): ContratoRow {
+  const u = c.unidadeOrgao ?? {};
+  const pj = c.tipoPessoa === "PJ";
+  const valor = typeof c.valorGlobal === "number" ? c.valorGlobal : typeof c.valorInicial === "number" ? c.valorInicial : null;
+  return {
+    id: c.numeroControlePNCP,
+    compra_id: clean(c.numeroControlePncpCompra),
+    orgao_cnpj: c.orgaoEntidade.cnpj,
+    orgao: clean(c.orgaoEntidade.razaoSocial) ?? c.orgaoEntidade.cnpj,
+    esfera: clean(c.orgaoEntidade.esferaId)?.slice(0, 1) ?? null,
+    uf: clean(u.ufSigla)?.toUpperCase().slice(0, 2) ?? null,
+    municipio: clean(u.municipioNome),
+    fornecedor_ni: pj ? clean(c.niFornecedor) : null,
+    fornecedor: pj ? clean(c.nomeRazaoSocialFornecedor) : c.tipoPessoa === "PF" ? "Pessoa física" : clean(c.nomeRazaoSocialFornecedor),
+    tipo_pessoa: clean(c.tipoPessoa),
+    objeto: clean(c.objetoContrato) ?? "(sem objeto informado)",
+    categoria: clean(c.categoriaProcesso?.nome),
+    tipo_contrato: clean(c.tipoContrato?.nome),
+    // Negative or absurd values are data-entry errors; keep them out of the sums.
+    valor_global: valor != null && valor >= 0 && valor < 1e11 ? valor : null,
+    data_assinatura: isoDay(c.dataAssinatura),
+    vigencia_inicio: isoDay(c.dataVigenciaInicio),
+    vigencia_fim: isoDay(c.dataVigenciaFim),
+    publicado_em: brDate(c.dataPublicacaoPncp),
+    atualizado_em: brDate(c.dataAtualizacaoGlobal ?? c.dataAtualizacao),
+  };
+}
+
+/** Contracts published on `dia` (YYYY-MM-DD). */
+export async function fetchContratos(dia: string, pagina: number, opts?: FetchOpts) {
+  const d = dia.replaceAll("-", "");
+  const url = `${CONSULTA_BASE}/contratos?dataInicial=${d}&dataFinal=${d}&pagina=${pagina}&tamanhoPagina=${CONTRATOS_PAGE_SIZE}`;
+  return getJson<PncpPage<PncpContrato>>(url, opts);
+}
+
 /** `dia` is YYYY-MM-DD. */
 export async function fetchPublicacoes(dia: string, modalidade: number, pagina: number, opts?: FetchOpts) {
   const d = dia.replaceAll("-", "");

@@ -10,7 +10,13 @@ export interface Filtros {
   desde?: Date;
   /** Exclude editais already sent for this alert. */
   excluirEnviadosAlerta?: number;
+  /** Proposals close within this many days. */
+  prazoDias?: number | null;
+  ordem?: Ordem;
 }
+
+export const ORDENS = { relevancia: "Relevância", prazo: "Prazo mais próximo", recentes: "Mais recentes", valor: "Maior valor" } as const;
+export type Ordem = keyof typeof ORDENS;
 
 /**
  * Turns "notebook, computador portátil; impressora -locação" into a websearch_to_tsquery string:
@@ -53,18 +59,26 @@ export function buildSearch(f: Filtros, { limit = 50, offset = 0 } = {}) {
   if (f.abertas ?? true) {
     where.push(`(encerramento > now() or (encerramento is null and publicado_em > now() - interval '15 days'))`);
   }
+  if (f.prazoDias) where.push(`encerramento < now() + make_interval(days => ${p(f.prazoDias)})`);
   if (f.desde) where.push(`ingerido_em > ${p(f.desde)}`);
   if (f.excluirEnviadosAlerta != null) {
     where.push(`not exists (select 1 from alert_envios ae where ae.alert_id = ${p(f.excluirEnviadosAlerta)} and ae.edital_id = editais.id)`);
   }
 
   const whereSql = where.length ? `where ${where.join(" and ")}` : "";
+  const ordem = f.ordem ?? (q ? "relevancia" : "prazo");
+  const orderBy = {
+    relevancia: `${q ? "rank desc, " : ""}encerramento asc nulls last, publicado_em desc`,
+    prazo: "encerramento asc nulls last, publicado_em desc",
+    recentes: "publicado_em desc nulls last",
+    valor: "valor_estimado desc nulls last, encerramento asc nulls last",
+  }[ordem];
   const sql = `
     select id, cnpj, ano, sequencial, orgao, unidade, uf, municipio, objeto, modalidade_id, modalidade, situacao,
            valor_estimado::float8 as valor_estimado, abertura, encerramento, publicado_em, ${rank} as rank,
            count(*) over () as total
     from editais ${whereSql}
-    order by ${q ? "rank desc," : ""} encerramento asc nulls last, publicado_em desc
+    order by ${orderBy}, id
     limit ${p(limit)} offset ${p(offset)}`;
   return { sql, params };
 }

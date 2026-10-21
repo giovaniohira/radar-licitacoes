@@ -33,6 +33,17 @@ export function verifySession(value: string | undefined, now = Date.now(), key?:
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+/** Per-user secret for the read-only calendar feed URL. */
+export function icsToken(userId: number, key?: string): string {
+  return hmac(`ics.${userId}`, key).slice(0, 32);
+}
+
+export function verifyIcsToken(userId: number, token: string, key?: string): boolean {
+  const expected = Buffer.from(icsToken(userId, key));
+  const got = Buffer.from(token);
+  return expected.length === got.length && timingSafeEqual(expected, got);
+}
+
 export function newLoginToken(): { token: string; hash: string } {
   const token = randomBytes(32).toString("base64url");
   return { token, hash: hashToken(token) };
