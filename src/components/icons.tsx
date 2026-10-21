@@ -50,7 +50,9 @@ export function Icon({ name, size = 16, className }: { name: IconName; size?: nu
 export function Logo() {
   return (
     <span className="brand">
-      <Icon name="radar" size={20} />
+      <span className="brand-mark">
+        <Icon name="radar" size={16} />
+      </span>
       Radar
     </span>
   );

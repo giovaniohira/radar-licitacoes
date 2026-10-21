@@ -52,14 +52,11 @@ export function prazo(d: Date | string | null | undefined, now = new Date()): st
   return dias === 1 ? "amanhã" : `em ${dias} dias`;
 }
 
-/** Badge tone for a deadline: closed, ≤3 days, ≤7 days, later. */
-export function prazoTom(d: Date | string | null | undefined, now = new Date()): "neutral" | "danger" | "warn" | "ok" {
+/** Only deadlines that `prazo()` shows as "em 3 dias" or sooner get a color; everything else stays neutral. */
+export function prazoTom(d: Date | string | null | undefined, now = new Date()): "neutral" | "warn" {
   if (!d) return "neutral";
   const ms = new Date(d).getTime() - now.getTime();
-  if (ms <= 0) return "neutral";
-  if (ms < 3 * 86_400_000) return "danger";
-  if (ms < 7 * 86_400_000) return "warn";
-  return "ok";
+  return ms > 0 && ms < 4 * 86_400_000 ? "warn" : "neutral";
 }
 
 // Kept upper-case when PNCP's all-caps text is converted.
@@ -112,4 +109,53 @@ export function nome(s: string | null | undefined): string {
 
 export function local(municipio: string | null | undefined, uf: string | null | undefined): string {
   return [nome(municipio), uf].filter(Boolean).join(" · ");
+}
+
+// Openings PNCP objects repeat word for word. Applied in a loop, so
+// "A presente licitação tem como objeto a contratação de empresa especializada para aquisição de X" ends at "X".
+const PREFIXOS = [
+  /^\[[^\]]*\]\s*[-–—:]?\s*/,
+  /^constitui\s+objeto\s+\S+\s+[^,.;]{0,60}?\bvisando\s+(?:[aào]\s+)?/i,
+  /^(?:[ao]\s+)?(?:presente|objeto)\s[^,.;]{0,80}?\s(?:objeto|objetivo|finalidade|visa|é)\s+(?:[ao]\s+|:\s*)?/i,
+  /^sele[cç][aã]o\s+da\s+proposta\s+mais\s+vantajosa\s+(?:para|visando)\s+(?:[ao]\s+)?/i,
+  /^despesa\s+referente\s+(?:[aà]\s+)?/i,
+  /^(?:implanta[cç][aã]o\s+de\s+)?registro\s+de\s+pre[cç]os?\s+(?:para\s+(?:[ao]s?\s+)?)?(?:futuras?\s+e\s+eventua(?:l|is)\s+)?/i,
+  /^contrata[cç][aã]o\s+de\s+(?:empresa|pessoa\s+jur[ií]dica)(?:\s+especializada)?\s+(?:para|visando|em|na|no)\s+(?:[ao]\s+)?/i,
+  /^(?:contrata[cç][aã]o|aquisi[cç][aã]o|fornecimento|presta[cç][aã]o)\s+de\s+/i,
+  /^servi[cç]os?\s+especializados?\s+(?:para|de|em)\s+/i,
+];
+const CAUDA = /,?\s+(?:que\s+ser[aã]o|destinad[oa]s?|conforme|para\s+atender|visando|a\s+fim\s+de|de\s+acordo\s+com|em\s+atendimento|atrav[eé]s\s+d[ae])\b.*$/i;
+
+/** Short list title for an object: drops the boilerplate opening and the "destinados a..." tail. Pass it through `frase()` first. */
+export function tituloCurto(objeto: string, max = 80): string {
+  let s = objeto.replace(/\s+/g, " ").trim();
+  for (let antes = ""; antes !== s; ) {
+    antes = s;
+    for (const re of PREFIXOS) s = s.replace(re, "");
+  }
+  s = s.replace(CAUDA, "").replace(/[\s,.;:-]+$/, "");
+  if (s.length < 3) return objeto;
+  if (s.length > max) s = s.slice(0, s.lastIndexOf(" ", max)) + "…";
+  return s[0].toLocaleUpperCase("pt-BR") + s.slice(1);
+}
+
+/** Lowercase without accents, for loose comparisons. */
+export const dobra = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
+
+/** Splits `texto` around the first alert keyword it contains (accent- and case-insensitive), or null. */
+export function destacar(texto: string, palavras: string): [string, string, string] | null {
+  const chars = [...texto];
+  const dobrados = chars.map(dobra);
+  // Index math below needs one folded char per original char.
+  if (dobrados.some((c) => c.length !== 1)) return null;
+  const alvo = dobrados.join("");
+  let melhor: [number, number] | null = null;
+  for (const termo of palavras.split(/[,;\n]+/)) {
+    const q = dobra(termo.replace(/"/g, "").replace(/(^|\s)-\S+/g, "")).trim();
+    const i = q ? alvo.indexOf(q) : -1;
+    if (i >= 0 && (!melhor || i < melhor[0])) melhor = [i, q.length];
+  }
+  if (!melhor) return null;
+  const [i, n] = melhor;
+  return [chars.slice(0, i).join(""), chars.slice(i, i + n).join(""), chars.slice(i + n).join("")];
 }

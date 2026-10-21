@@ -130,7 +130,7 @@ async function Busca({ searchParams }: PageProps<"/buscar">) {
             {rows.length === 0 ? (
               <Empty title="Nenhum edital encontrado">Tente menos palavras, outra grafia ou remova filtros de estado e valor.</Empty>
             ) : (
-              rows.map((e) => <EditalItem key={e.id} e={e} />)
+              rows.map((e) => <EditalItem key={e.id} e={e} termos={f.palavras} />)
             )}
             {paginas > 1 && (
               <div className="pager">
