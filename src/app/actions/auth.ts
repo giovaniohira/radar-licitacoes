@@ -66,16 +66,16 @@ export async function confirmarLogin(form: FormData) {
   const token = String(form.get("token") ?? "");
   // Single use: the UPDATE only matches an unused, unexpired token.
   const rows = token
-    ? await query<{ user_id: number }>(
-        `update login_tokens set usado_em = now()
-         where token_hash = $1 and usado_em is null and expira_em > now()
-         returning user_id`,
+    ? await query<{ user_id: number; novo: boolean }>(
+        `update login_tokens t set usado_em = now() from users u
+         where u.id = t.user_id and t.token_hash = $1 and t.usado_em is null and t.expira_em > now()
+         returning t.user_id, u.onboarding_em is null as novo`,
         [hashToken(token)],
       )
     : [];
   if (!rows[0]) redirect("/entrar?erro=1");
   await startSession(rows[0].user_id);
-  redirect("/painel");
+  redirect(rows[0].novo ? "/boas-vindas" : "/painel");
 }
 
 export async function entrarDemo() {
