@@ -107,8 +107,10 @@ export function nome(s: string | null | undefined): string {
   return isAllCaps(s) ? recase(s, true) : s;
 }
 
-export function local(municipio: string | null | undefined, uf: string | null | undefined): string {
-  return [nome(municipio), uf].filter(Boolean).join(" · ");
+/** "Cairu · BA"; given the buyer, drops the city it already names ("Município de Cairu" → "BA"). */
+export function local(municipio: string | null | undefined, uf: string | null | undefined, orgao?: string): string {
+  const cidade = nome(municipio);
+  return [orgao && cidade && dobra(orgao).includes(dobra(cidade)) ? "" : cidade, uf].filter(Boolean).join(" · ");
 }
 
 // Openings PNCP objects repeat word for word. Applied in a loop, so

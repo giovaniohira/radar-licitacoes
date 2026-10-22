@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hashToken, icsToken, newLoginToken, normalizeEmail, signSession, verifyIcsToken, verifySession } from "@/lib/auth";
 import { renderDigest, type Alert } from "@/lib/alerts";
-import { destacar, formatBRL, formatDia, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
 import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
@@ -92,6 +92,11 @@ describe("format", () => {
     expect(prazo("2026-10-17T13:00:00Z", now)).toBe("amanhã");
     expect(prazo("2026-10-26T13:00:00Z", now)).toBe("em 10 dias");
     expect(prazo(null, now)).toBe("sem prazo");
+  });
+  it("drops the city when the buyer already names it", () => {
+    expect(local("CAIRU", "BA")).toBe("Cairu · BA");
+    expect(local("CAIRU", "BA", "MUNICIPIO DE CAIRU")).toBe("BA");
+    expect(local("SÃO PAULO", "SP", "Secretaria Municipal de Saúde")).toBe("São Paulo · SP");
   });
   it("treats 0 as secret budget", () => {
     expect(formatBRL(0)).toBe("Sigiloso");

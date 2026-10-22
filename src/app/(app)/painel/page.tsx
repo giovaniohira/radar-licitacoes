@@ -115,6 +115,33 @@ function Prazos({ itens }: { itens: PipelineItem[] }) {
   );
 }
 
+/** Setup checklist for new accounts; every item is read from data the user already created, and the card goes away once all are done. */
+function PrimeirosPassos({ passos }: { passos: { label: string; href: string; feito: boolean }[] }) {
+  const feitos = passos.filter((p) => p.feito).length;
+  if (feitos === passos.length) return null;
+  return (
+    <section className="card">
+      <div className="spread">
+        <h2>Primeiros passos</h2>
+        <span className="xs subtle num">
+          {feitos} de {passos.length}
+        </span>
+      </div>
+      <div className="progress">
+        <i style={{ width: `${(feitos / passos.length) * 100}%` }} />
+      </div>
+      <ol className="primeiros">
+        {passos.map((p) => (
+          <li key={p.label} className={p.feito ? "feito" : undefined}>
+            <span className="marca">{p.feito && <Icon name="check" size={12} />}</span>
+            {p.feito ? <span>{p.label}</span> : <Link href={p.href}>{p.label}</Link>}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function EmDisputa({ itens }: { itens: PipelineItem[] }) {
   const etapas = ETAPAS.filter((e) => EM_DISPUTA.includes(e.id)).map((e) => {
     const lista = itens.filter((i) => i.etapa === e.id);
@@ -160,10 +187,12 @@ function EmDisputa({ itens }: { itens: PipelineItem[] }) {
 async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchParams">) {
   await connection();
   const user = await requireUser();
-  const aba = first((await searchParams).alerta);
-  const [itens, alerts] = await Promise.all([
+  const sp = await searchParams;
+  const aba = first(sp.alerta);
+  const [itens, alerts, [{ resumiu }]] = await Promise.all([
     listPipeline(pool(), user.id),
     query<AlertRow>(`select id, nome, palavras, ufs, modalidades, valor_min, valor_max from alerts where user_id = $1 and ativo order by id`, [user.id]),
+    query<{ resumiu: boolean }>(`select exists (select 1 from pipeline p join resumos r using (edital_id) where p.user_id = $1) as resumiu`, [user.id]),
   ]);
 
   // New matches per alert in the last 24h, same query the daily digest uses.
@@ -198,6 +227,14 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
   const etapaDe = new Map(itens.map((i) => [i.edital_id, i.etapa]));
   const urgentes = vencendo(itens, 4).length;
   const proximoEmail = Number(horaBR.format(new Date())) < 7 ? "hoje, 7h" : "amanhã, 7h";
+  const passos = [
+    { label: "Criar seu primeiro alerta", href: "/boas-vindas", feito: alerts.length > 0 },
+    { label: "Acompanhar um edital", href: "/buscar", feito: itens.length > 0 },
+    ...(process.env.ANTHROPIC_API_KEY
+      ? [{ label: "Ler o resumo por IA de um edital que você acompanha", href: itens[0] ? editalHref(itens[0].edital_id) : "/buscar", feito: resumiu }]
+      : []),
+    { label: "Levar um edital para Em análise no pipeline", href: "/pipeline", feito: itens.some((i) => i.etapa !== "triagem" && i.etapa !== "descartada") },
+  ];
 
   return (
     <div className="page">
@@ -227,6 +264,11 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
           <Icon name="plus" size={14} /> Novo alerta
         </Link>
       </div>
+      {first(sp.bemvindo) && (
+        <div className="notice ok" style={{ marginBottom: 16 }}>
+          <b>Tudo pronto.</b> Seu alerta já está ativo: os editais novos aparecem aqui, e o primeiro e-mail com os abertos que combinam com ele sai {proximoEmail}.
+        </div>
+      )}
 
       <div className="grid cols-main">
         <section className="card inbox" aria-labelledby="inbox-h" style={{ overflow: "hidden" }}>
@@ -250,7 +292,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
           )}
           {alerts.length === 0 ? (
             <Empty title="Nenhum alerta ativo">
-              <Link className="link" href="/alertas">
+              <Link className="link" href="/boas-vindas">
                 Crie um alerta
               </Link>{" "}
               e os editais novos aparecem aqui e no seu e-mail das 7h.
@@ -288,6 +330,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
         </section>
 
         <aside className="rail" aria-label="Pipeline">
+          {!user.demo && <PrimeirosPassos passos={passos} />}
           <Prazos itens={itens} />
           <EmDisputa itens={itens} />
           <section className="card mail-card">

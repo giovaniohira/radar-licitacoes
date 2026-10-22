@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { destacar, dobra, formatBRL, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { destacar, formatBRL, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { Icon } from "./icons";
 
 export function PrazoBadge({ d }: { d: Date | string | null }) {
@@ -76,8 +76,7 @@ export function EditalItem({
   const titulo = tituloCurto(objeto);
   const hit = termos ? destacar(objeto, termos) : null;
   const orgao = nome(e.orgao);
-  // "Município de Cairu · Cairu · BA" names the city twice.
-  const lugar = e.municipio && dobra(orgao).includes(dobra(nome(e.municipio))) ? e.uf : local(e.municipio, e.uf);
+  const lugar = local(e.municipio, e.uf, orgao);
   const valor = formatBRL(e.valor_estimado);
   const urgente = prazoTom(e.encerramento) === "warn";
   return (
