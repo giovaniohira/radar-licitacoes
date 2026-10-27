@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Logo } from "@/components/icons";
-import { entrarDemo } from "../actions/auth";
 
 export default function SiteLayout({ children }: LayoutProps<"/">) {
   return (
@@ -23,9 +22,9 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
             <Link className="btn btn-ghost" href="/entrar">
               Entrar
             </Link>
-            <form action={entrarDemo}>
-              <button className="btn btn-primary">Ver a demo</button>
-            </form>
+            <Link className="btn btn-primary" href="/entrar">
+              Criar meu alerta
+            </Link>
           </nav>
         </div>
       </header>

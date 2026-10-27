@@ -95,8 +95,7 @@ ${grupos
 export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => void = () => {}): Promise<number> {
   const alerts = (
     await db.query<Alert & { email: string }>(
-      // The demo account is shared and its address is fake, so it never gets mail.
-      `select a.*, u.email from alerts a join users u on u.id = a.user_id where a.ativo and not u.demo order by a.user_id, a.id`,
+      `select a.*, u.email from alerts a join users u on u.id = a.user_id where a.ativo order by a.user_id, a.id`,
     )
   ).rows;
   const porUsuario = new Map<string, (Alert & { email: string })[]>();

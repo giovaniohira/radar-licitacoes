@@ -14,7 +14,8 @@ describe("session", () => {
   it("round-trips and rejects tampering", () => {
     const now = Date.UTC(2026, 9, 16);
     const s = signSession(42, now, KEY);
-    expect(verifySession(s, now, KEY)).toBe(42);
+    expect(verifySession(s, now, KEY)?.id).toBe(42);
+    expect(verifySession(s, now, KEY)?.emitida).toBe(Math.floor(now / 1000));
     expect(verifySession(s.replace(/^42/, "43"), now, KEY)).toBeNull();
     expect(verifySession(s, now, "x".repeat(40))).toBeNull();
     expect(verifySession("lixo", now, KEY)).toBeNull();
@@ -23,7 +24,7 @@ describe("session", () => {
   it("expires after 30 days", () => {
     const now = Date.UTC(2026, 9, 16);
     const s = signSession(1, now, KEY);
-    expect(verifySession(s, now + 29 * 86400_000, KEY)).toBe(1);
+    expect(verifySession(s, now + 29 * 86400_000, KEY)?.id).toBe(1);
     expect(verifySession(s, now + 31 * 86400_000, KEY)).toBeNull();
   });
   it("login tokens are random and stored hashed", () => {

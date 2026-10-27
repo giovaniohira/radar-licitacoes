@@ -330,7 +330,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
         </section>
 
         <aside className="rail" aria-label="Pipeline">
-          {!user.demo && <PrimeirosPassos passos={passos} />}
+          <PrimeirosPassos passos={passos} />
           <Prazos itens={itens} />
           <EmDisputa itens={itens} />
           <section className="card mail-card">

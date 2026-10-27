@@ -72,11 +72,7 @@ async function Alertas({ searchParams }: PageProps<"/alertas">) {
     <div className="page">
       <PageHead
         title="Alertas"
-        sub={
-          user.demo
-            ? "Na conta demo os alertas funcionam, mas nenhum e-mail é enviado."
-            : `Um único e-mail por dia, às 7h, para ${user.email}, só com editais que você ainda não recebeu.`
-        }
+        sub={`Um único e-mail por dia, às 7h, para ${user.email}, só com editais que você ainda não recebeu.`}
       />
       {first(sp.salvo) && <div className="notice ok" style={{ marginBottom: 16 }}>Busca salva como alerta.</div>}
       {erro && <div className="notice danger" style={{ marginBottom: 16 }}>{erro}</div>}

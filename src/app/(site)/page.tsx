@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 import Form from "next/form";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -9,73 +9,30 @@ import { pool, query } from "@/lib/db";
 import { formatBRL, formatInt, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { analisar } from "@/lib/mercado";
 import { SETORES } from "@/lib/setores";
-import { entrarDemo } from "../actions/auth";
 
-const PASSOS: { titulo: string; texto: string; demo: ReactNode }[] = [
+const PASSOS: { titulo: string; texto: string }[] = [
   {
     titulo: "Diga o que você vende",
-    texto: "Busca em português, sem se preocupar com acento, em todos os editais abertos do país.",
-    demo: (
-      <>
-        <span className="mini-input">notebook, impressora, toner</span>
-        <span className="row" style={{ gap: 6 }}>
-          <span className="tag outline">SP, PR, SC</span>
-          <span className="tag outline">até R$ 500 mil</span>
-        </span>
-      </>
-    ),
+    texto: "Do jeito que você fala: “merenda escolar”, “reforma de telhado”. Com ou sem acento, a busca cobre todos os editais abertos do país.",
   },
   {
     titulo: "Receba só o que é novo",
-    texto: "Um e-mail por dia, às 7h, sem repetir edital que você já viu.",
-    demo: (
-      <>
-        <span className="mini-mail">
-          <span className="mono">07:00</span> Editais novos para você
-        </span>
-        <span className="mini-mail" style={{ opacity: 0.55 }}>
-          <span className="mono">ontem</span> Editais novos para você
-        </span>
-      </>
-    ),
+    texto: "Às 7h chega um e-mail com o que saiu desde ontem. Nada repetido, nenhum portal para abrir.",
   },
   {
-    titulo: "Entenda o edital sem ler o PDF",
-    texto: "A IA aponta prazos, documentos, cota ME/EPP, garantia e as armadilhas para empresa pequena.",
-    demo: (
-      <>
-        <span className="row" style={{ gap: 6 }}>
-          <span className="tag accent">Cota ME/EPP</span>
-          <span className="tag outline">Garantia</span>
-        </span>
-        <span className="small" style={{ color: "var(--warn)", fontWeight: 550 }}>
-          Pontos de atenção
-        </span>
-        <span className="small muted">Documentos de habilitação</span>
-      </>
-    ),
+    titulo: "Decida sem ler o PDF inteiro",
+    texto: "A IA lê o edital e mostra prazos, documentos exigidos, cota ME/EPP, garantia e o que pode desclassificar você.",
   },
   {
-    titulo: "Acompanhe até o resultado",
-    texto: "Pipeline com checklist de documentos e os prazos direto no seu Google Agenda.",
-    demo: (
-      <span className="mini-board">
-        {["Triagem", "Proposta", "Ganha"].map((c, i) => (
-          <span key={c}>
-            <b className={i === 2 ? "ok" : undefined}>{c}</b>
-            <i className={i === 2 ? "ok" : undefined} />
-            {i === 0 && <i />}
-          </span>
-        ))}
-      </span>
-    ),
+    titulo: "Não perca nenhum prazo",
+    texto: "Cada disputa vira um card com checklist de documentos, e os prazos aparecem no seu Google Agenda.",
   },
 ];
 
 const CONFIANCA: { icon: IconName; titulo: string; texto: string }[] = [
-  { icon: "building", titulo: "Dados oficiais do PNCP", texto: "Lemos o portal federal 3 vezes por dia. Cada edital tem o link para a fonte." },
-  { icon: "mail", titulo: "Entrar sem senha", texto: "Um link de uso único no seu e-mail. Nada para decorar ou vazar." },
-  { icon: "check", titulo: "Privacidade de pessoa física", texto: "Contratos com pessoa física ficam sem CPF e sem nome, e nunca entram em rankings." },
+  { icon: "building", titulo: "Direto da fonte oficial", texto: "Lemos o PNCP, o portal federal de compras, 3 vezes por dia. Todo edital tem o link para o original." },
+  { icon: "mail", titulo: "Sem senha", texto: "Você entra por um link de uso único no seu e-mail. Não há senha para esquecer nem para vazar." },
+  { icon: "check", titulo: "CPF fica de fora", texto: "Contratos com pessoa física aparecem sem nome e sem CPF, e nunca entram em rankings." },
 ];
 
 /** Recent, still-open editais with a real budget: the landing's live proof. */
@@ -121,20 +78,35 @@ async function Metricas() {
 async function Previa() {
   await connection();
   const editais = await recentes(3);
-  return editais.map((e) => (
-    <Link key={e.id} href={editalHref(e.id)} className="previa-row">
-      <span style={{ minWidth: 0 }}>
-        <b>{tituloCurto(frase(e.objeto), 60)}</b>
-        <small>
-          {nome(e.orgao)} · {e.uf}
-        </small>
-      </span>
-      <span className="r">
-        <b className="num">{formatBRL(e.valor_estimado)}</b>
-        <small className={prazoTom(e.encerramento) === "warn" ? "urgente" : undefined}>{prazo(e.encerramento)}</small>
-      </span>
-    </Link>
-  ));
+  // The masthead lives here, not in the static shell, because its dateline is request time.
+  const data = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(
+    new Date(),
+  );
+  return (
+    <>
+      <div className="previa-head">
+        <span className="titulo">Editais</span>
+        <span className="linha">
+          <span>Informática e TI</span>
+          <span>{data}, 7h</span>
+        </span>
+      </div>
+      {editais.map((e) => (
+        <Link key={e.id} href={editalHref(e.id)} className="previa-row">
+          <span style={{ minWidth: 0 }}>
+            <b>{tituloCurto(frase(e.objeto), 60)}</b>
+            <small>
+              {nome(e.orgao)}, {e.uf}
+            </small>
+          </span>
+          <span className="r">
+            <b className="num">{formatBRL(e.valor_estimado)}</b>
+            <small className={prazoTom(e.encerramento) === "warn" ? "urgente" : undefined}>{prazo(e.encerramento)}</small>
+          </span>
+        </Link>
+      ))}
+    </>
+  );
 }
 
 async function AoVivo() {
@@ -151,7 +123,7 @@ async function AoVivo() {
         <h3>Quem mais vendeu ao governo (30 dias)</h3>
         <HBars rows={mercado.fornecedores.slice(0, 8).map((f) => ({ ...f, nome: nome(f.nome) }))} href={(id) => `/fornecedor/${id}`} />
         <Link className="link small" href="/mercado">
-          Ver o mercado completo
+          Ver quem compra e quem vence no seu mercado
         </Link>
       </div>
     </div>
@@ -163,12 +135,11 @@ export default function Home() {
     <main>
       <section className="hero container">
         <div className="hero-copy">
-          <span className="eyebrow">
-            <span className="live-dot" /> Ao vivo do PNCP · atualizado 3 vezes por dia
-          </span>
-          <h1>Os editais que sua empresa pode ganhar, no seu e-mail às 7h.</h1>
+          <p className="overline">Para empresas que vendem ao governo, em todo o Brasil</p>
+          <h1>Nunca mais perca um edital que sua empresa podia ganhar.</h1>
           <p className="lead">
-            O Radar lê o Portal Nacional de Contratações Públicas, resume cada edital com IA e organiza suas propostas até o resultado.
+            Pare de garimpar portal. Às 7h, o Radar manda só os editais que combinam com o que você vende, já resumidos por IA, para você
+            decidir em minutos se vale disputar.
           </p>
           <Form action="/buscar" className="hero-form">
             <label htmlFor="hero-q">O que sua empresa vende?</label>
@@ -192,37 +163,19 @@ export default function Home() {
         </div>
 
         <div className="hero-visual" aria-label="Prévia do e-mail diário">
-          <svg className="rings" viewBox="0 0 520 520" aria-hidden="true">
-            <circle cx="260" cy="260" r="80" />
-            <circle cx="260" cy="260" r="150" />
-            <circle cx="260" cy="260" r="220" />
-            <path d="M260 260 L415 105" />
-          </svg>
           <div className="previa">
-            <div className="previa-head">
-              <span className="brand-mark">
-                <Icon name="radar" size={15} />
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <b>Editais novos para Informática e TI</b>
-                <small>Radar · hoje, 07:00</small>
-              </span>
-              <span className="tag accent">E-mail</span>
-            </div>
-            <Suspense fallback={<div style={{ height: 210 }} />}>
+            <Suspense fallback={<div style={{ height: 290 }} />}>
               <Previa />
             </Suspense>
           </div>
           <div className="previa-ia">
-            <span className="row" style={{ gap: 8, color: "var(--sidebar-accent)", fontWeight: 600 }}>
-              <Icon name="sparkles" size={15} /> Exemplo de resumo por IA
-            </span>
+            <span className="overline">Exemplo de resumo por IA</span>
             <span className="row" style={{ gap: 6 }}>
               <span className="tag">Cota ME/EPP</span>
               <span className="tag">Sem garantia</span>
               <span className="tag">8 documentos</span>
             </span>
-            <span style={{ color: "#f7c9a6" }}>Atenção: amostra do produto em 3 dias úteis</span>
+            <span className="atencao">Atenção: amostra do produto em 3 dias úteis</span>
           </div>
         </div>
       </section>
@@ -237,16 +190,13 @@ export default function Home() {
 
       <section id="como" className="section container">
         <div className="section-head">
-          <p className="overline" style={{ color: "var(--accent-text)" }}>
-            Como funciona
-          </p>
-          <h2>Do edital publicado à proposta enviada.</h2>
+          <p className="overline">Como funciona</p>
+          <h2>Do edital publicado à proposta enviada, sem planilha.</h2>
         </div>
         <div className="grid g4 passos">
           {PASSOS.map((p, i) => (
-            <article key={p.titulo} className="card passo">
-              <span className="mono subtle">0{i + 1}</span>
-              <div className="passo-demo">{p.demo}</div>
+            <article key={p.titulo} className="passo">
+              <span className="n">{i + 1}</span>
               <h3>{p.titulo}</h3>
               <p>{p.texto}</p>
             </article>
@@ -257,11 +207,11 @@ export default function Home() {
       <section className="section container">
         <div className="section-head spread" style={{ maxWidth: "none", alignItems: "flex-end" }}>
           <div>
-            <h2>Publicados nas últimas horas</h2>
-            <p>Editais e contratos reais, direto do banco do Radar. Nada aqui é exemplo.</p>
+            <h2>O que saiu nas últimas horas</h2>
+            <p>Editais e contratos reais, direto do banco do Radar. É isso que chega no seu e-mail. Nada aqui é exemplo.</p>
           </div>
           <Link className="link" href="/buscar">
-            Ver todos os editais abertos →
+            Ver todos os editais abertos
           </Link>
         </div>
         <Suspense fallback={<div className="card" style={{ height: 420 }} />}>
@@ -271,8 +221,8 @@ export default function Home() {
 
       <section id="setores" className="section container">
         <div className="section-head">
-          <h2>Comece pelo seu setor</h2>
-          <p>Palavras-chave prontas por ramo. Edite à vontade depois.</p>
+          <h2>Não sabe que palavra buscar?</h2>
+          <p>Escolha seu ramo. A busca já vem com as palavras-chave que os órgãos usam, e você ajusta depois.</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
           {SETORES.map((s) => (
@@ -300,19 +250,12 @@ export default function Home() {
       <section className="cta-band">
         <div className="container spread">
           <div>
-            <h2>Veja o Radar com dados de verdade.</h2>
-            <p>A demo já vem com alertas e um pipeline montados. Sem cadastro.</p>
+            <h2>Amanhã às 7h, os editais do seu ramo no seu e-mail.</h2>
+            <p>Entre só com seu e-mail, sem senha, diga o que você vende e pronto.</p>
           </div>
-          <div className="row" style={{ gap: 10 }}>
-            <form action={entrarDemo}>
-              <button className="btn btn-lg cta-claro">
-                Abrir a demo <Icon name="arrowRight" />
-              </button>
-            </form>
-            <Link className="btn btn-lg cta-contorno" href="/entrar">
-              Criar minha conta
-            </Link>
-          </div>
+          <Link className="btn btn-lg btn-primary" href="/entrar">
+            Montar meu primeiro alerta
+          </Link>
         </div>
       </section>
     </main>
