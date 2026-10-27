@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -10,14 +10,23 @@ import { pool } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, nome } from "@/lib/format";
 import { analisar, contratosRecentes, fornecedorInfo } from "@/lib/mercado";
 
-export const metadata: Metadata = { title: "Fornecedor" };
+const getFornecedor = cache((ni: string) => fornecedorInfo(pool(), ni));
+
+export async function generateMetadata({ params }: PageProps<"/fornecedor/[ni]">): Promise<Metadata> {
+  const ni = (await params).ni.replace(/\D/g, "");
+  const info = ni.length === 14 ? await getFornecedor(ni) : null;
+  if (!info) return { title: "Fornecedor não encontrado" };
+  const title = nome(info.nome);
+  const description = `Contratos com o governo, principais órgãos clientes e o que ${title} (CNPJ ${formatCNPJ(ni)}) vende, com dados do PNCP.`;
+  return { title, description, alternates: { canonical: `/fornecedor/${ni}` }, openGraph: { title, description } };
+}
 
 async function Fornecedor({ params }: PageProps<"/fornecedor/[ni]">) {
   await connection();
   // Only companies (14-digit CNPJ) have profiles; individuals are never stored with an identifier.
   const ni = (await params).ni.replace(/\D/g, "");
   if (ni.length !== 14) notFound();
-  const info = await fornecedorInfo(pool(), ni);
+  const info = await getFornecedor(ni);
   if (!info) notFound();
   const f = { fornecedor: ni, dias: 365 };
   const [m, recentes] = await Promise.all([analisar(pool(), f), contratosRecentes(pool(), f, 20)]);

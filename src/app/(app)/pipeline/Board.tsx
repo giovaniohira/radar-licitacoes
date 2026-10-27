@@ -107,7 +107,7 @@ function Drawer({
             <h3>Checklist de habilitação</h3>
             {det && det.checklist.length === 0 && (
               <button className="btn btn-sm" disabled={pending} onClick={() => start(async () => update(await importarChecklistIA(item.edital_id)))}>
-                <Icon name="sparkles" size={12} /> Importar do resumo IA
+                <Icon name="file" size={12} /> Importar do resumo IA
               </button>
             )}
           </div>

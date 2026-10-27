@@ -10,7 +10,7 @@ function Cabecalho({ children }: { children?: ReactNode }) {
     <div className="card-head">
       <div className="row" style={{ gap: 10 }}>
         <span className="ia-mark">
-          <Icon name="sparkles" />
+          <Icon name="file" />
         </span>
         <h2>Resumo do edital</h2>
       </div>
@@ -105,7 +105,7 @@ export function ResumoIA({ editalId, inicial }: { editalId: string; inicial: Res
         </p>
         <div>
           <button type="submit" className="btn btn-primary" disabled={pending}>
-            <Icon name="sparkles" size={14} /> {pending ? "Lendo o edital… (até 1 min)" : "Resumir edital com IA"}
+            <Icon name="file" size={14} /> {pending ? "Lendo o edital… (até 1 min)" : "Resumir edital com IA"}
           </button>
         </div>
         {state?.error && <div className="notice danger">{state.error}</div>}

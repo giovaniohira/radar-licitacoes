@@ -12,7 +12,7 @@ import { ETAPAS, etapaLabel, listPipeline } from "@/lib/pipeline";
 import { requireUser } from "@/lib/session";
 import { Board } from "./Board";
 
-export const metadata: Metadata = { title: "Pipeline" };
+export const metadata: Metadata = { title: "Pipeline", robots: { index: false } };
 
 async function Pipeline({ searchParams }: PageProps<"/pipeline">) {
   await connection();

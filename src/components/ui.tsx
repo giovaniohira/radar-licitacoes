@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { destacar, dobra, formatBRL, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { destacar, formatBRL, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { Icon } from "./icons";
 
 export function PrazoBadge({ d }: { d: Date | string | null }) {
@@ -41,7 +41,25 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 }
 
 export function Loading({ label = "Carregando…" }: { label?: string }) {
-  return <div className="page muted">{label}</div>;
+  return (
+    <div className="page" role="status" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <div className="page-head">
+        <div style={{ display: "grid", gap: 10 }}>
+          <span className="sk" style={{ width: 140, height: 12 }} />
+          <span className="sk" style={{ width: 240, height: 30 }} />
+        </div>
+      </div>
+      <div className="card" style={{ overflow: "hidden" }}>
+        {[70, 55, 80, 60].map((w) => (
+          <div key={w} className="sk-row">
+            <span className="sk" style={{ width: `${w}%`, height: 14 }} />
+            <span className="sk" style={{ width: `${w - 25}%`, height: 10 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export interface EditalLinha {
@@ -76,8 +94,7 @@ export function EditalItem({
   const titulo = tituloCurto(objeto);
   const hit = termos ? destacar(objeto, termos) : null;
   const orgao = nome(e.orgao);
-  // "Município de Cairu · Cairu · BA" names the city twice.
-  const lugar = e.municipio && dobra(orgao).includes(dobra(nome(e.municipio))) ? e.uf : local(e.municipio, e.uf);
+  const lugar = local(e.municipio, e.uf, orgao);
   const valor = formatBRL(e.valor_estimado);
   const urgente = prazoTom(e.encerramento) === "warn";
   return (

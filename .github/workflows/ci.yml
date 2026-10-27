@@ -83,7 +83,9 @@ jobs:
         with:
           context: .
           target: web
-          build-args: BASE_PATH=/radar
+          build-args: |
+            BASE_PATH=/radar
+            APP_URL=${{ env.PUBLIC_URL }}
           push: true
           tags: ${{ env.REGISTRY }}/radar-licitacoes-web:${{ env.TAG }},${{ env.REGISTRY }}/radar-licitacoes-web:latest
           cache-from: type=gha,scope=web

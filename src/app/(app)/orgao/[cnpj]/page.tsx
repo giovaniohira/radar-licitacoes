@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -10,14 +10,23 @@ import { pool, query } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, local, nome } from "@/lib/format";
 import { analisar, contratosRecentes, orgaoInfo } from "@/lib/mercado";
 
-export const metadata: Metadata = { title: "Órgão comprador" };
+const getOrgao = cache((cnpj: string) => orgaoInfo(pool(), cnpj));
+
+export async function generateMetadata({ params }: PageProps<"/orgao/[cnpj]">): Promise<Metadata> {
+  const cnpj = (await params).cnpj.replace(/\D/g, "");
+  const info = await getOrgao(cnpj);
+  if (!info) return { title: "Órgão não encontrado" };
+  const title = nome(info.nome);
+  const description = `Editais abertos, contratos dos últimos 12 meses e fornecedores que mais vendem para ${title} (${local(info.municipio, info.uf) || "Brasil"}).`;
+  return { title, description, alternates: { canonical: `/orgao/${cnpj}` }, openGraph: { title, description } };
+}
 
 const ESFERA: Record<string, string> = { M: "Municipal", E: "Estadual", F: "Federal", D: "Distrital" };
 
 async function Orgao({ params }: PageProps<"/orgao/[cnpj]">) {
   await connection();
   const cnpj = (await params).cnpj.replace(/\D/g, "");
-  const info = await orgaoInfo(pool(), cnpj);
+  const info = await getOrgao(cnpj);
   if (!info) notFound();
   const f = { orgao: cnpj, dias: 365 };
   const [m, recentes, abertos] = await Promise.all([

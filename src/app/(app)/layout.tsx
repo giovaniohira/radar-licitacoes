@@ -9,35 +9,27 @@ async function UserBox() {
   const user = await currentUser();
   if (!user) {
     return (
-      <Link href="/entrar" className="btn btn-primary" style={{ width: "100%" }}>
+      <Link
+        href="/entrar"
+        className="btn btn-primary"
+        style={{ width: "100%" }}
+      >
         Entrar
       </Link>
     );
   }
   return (
-    <>
-      {user.demo && (
-        <div className="demo-box">
-          <p>
-            <b>Você está na demo.</b> Os dados voltam ao início todo dia às 4h.
-          </p>
-          <Link href="/entrar" className="btn btn-sm">
-            Criar minha conta
-          </Link>
-        </div>
-      )}
-      <div className="user-box">
+    <div className="user-box">
+      <Link href="/conta" className="user-link" title="Conta">
         <span className="avatar">{user.email[0]}</span>
-        <span className="email" title={user.email}>
-          {user.demo ? "Conta demo" : user.email}
-        </span>
-        <form action={sair} style={{ marginLeft: "auto" }}>
-          <button className="btn btn-ghost btn-sm" aria-label="Sair" title="Sair">
-            <Icon name="logout" size={14} />
-          </button>
-        </form>
-      </div>
-    </>
+        <span className="email">{user.email}</span>
+      </Link>
+      <form action={sair} style={{ marginLeft: "auto" }}>
+        <button className="btn btn-ghost btn-sm" aria-label="Sair" title="Sair">
+          <Icon name="logout" size={14} />
+        </button>
+      </form>
+    </div>
   );
 }
 

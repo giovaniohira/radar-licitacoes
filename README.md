@@ -2,7 +2,7 @@
 
 **Encontre, acompanhe e ganhe licitações públicas.** O Radar lê todo dia o Portal Nacional de Contratações Públicas (PNCP), avisa por e-mail quando sai um edital que combina com a sua empresa, resume o PDF do edital com IA, organiza as propostas num pipeline e mostra quem compra e quem vence no seu mercado.
 
-**No ar:** https://apps.giovaniohira.com/radar · o botão **Ver demo** abre uma conta já montada, sem cadastro.
+**No ar:** https://apps.giovaniohira.com/radar
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/painel-dark.png">
@@ -36,7 +36,7 @@
 PNCP /contratacoes ─┐                     ┌─ web (Next.js 16, Partial Prerender)
 PNCP /contratos  ───┼─► jobs (scheduler) ─► Postgres ─┤
                     │   06/12/18h editais              └─ e-mail diário (SMTP)
-                    │   06h contratos · 07h digest · 04h demo
+                    │   06h contratos · 07h digest
 Claude API ◄────────┴──────────────────────────── resumo do edital sob demanda
 ```
 

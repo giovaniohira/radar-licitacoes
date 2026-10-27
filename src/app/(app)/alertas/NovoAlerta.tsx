@@ -85,7 +85,7 @@ export function NovoAlerta() {
         {preview && (
           <div className="notice info stack" style={{ gap: 6 }}>
             <b>{formatInt(preview.total)} editais abertos batem com este alerta agora.</b>
-            {preview.exemplos.map((e) => (
+            {preview.exemplos.slice(0, 3).map((e) => (
               <Link key={e.id} href={editalHref(e.id)} className="small" target="_blank">
                 · {frase(e.objeto).slice(0, 110)} ({nome(e.orgao)}, {e.uf})
               </Link>

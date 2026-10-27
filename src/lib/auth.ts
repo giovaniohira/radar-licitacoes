@@ -21,7 +21,8 @@ export function signSession(userId: number, now = Date.now(), key?: string): str
   return `${body}.${hmac(body, key)}`;
 }
 
-export function verifySession(value: string | undefined, now = Date.now(), key?: string): number | null {
+/** Returns the user id and when the session was issued (epoch seconds), or null if forged or expired. */
+export function verifySession(value: string | undefined, now = Date.now(), key?: string): { id: number; emitida: number } | null {
   if (!value) return null;
   const [uid, exp, sig] = value.split(".");
   if (!uid || !exp || !sig) return null;
@@ -30,7 +31,7 @@ export function verifySession(value: string | undefined, now = Date.now(), key?:
   if (expected.length !== got.length || !timingSafeEqual(expected, got)) return null;
   if (Number(exp) * 1000 < now) return null;
   const id = Number(uid);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  return Number.isInteger(id) && id > 0 ? { id, emitida: Number(exp) - SESSION_DAYS * 86400 } : null;
 }
 
 /** Per-user secret for the read-only calendar feed URL. */
