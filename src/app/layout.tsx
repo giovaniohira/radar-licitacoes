@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const sans = IBM_Plex_Sans({ variable: "--font-sans", subsets: ["latin"] });
-const serif = Newsreader({ variable: "--font-serif", subsets: ["latin"], axes: ["opsz"] });
-const mono = IBM_Plex_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "500"] });
+const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });
+const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
 const description =
   "Nunca mais perca um edital que sua empresa podia ganhar. Alerta diário com as licitações do PNCP que combinam com o que você vende, resumo do edital por IA e controle das propostas até o resultado.";
@@ -20,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
+    <html lang="pt-BR" className={`${sans.variable} ${mono.variable}`}>
       <body>
         <a className="skip" href="#conteudo">
           Pular para o conteúdo

@@ -100,19 +100,8 @@ async function Metricas() {
 async function Previa() {
   await connection();
   const editais = await recentes(3);
-  // The masthead lives here, not in the static shell, because its dateline is request time.
-  const data = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(
-    new Date(),
-  );
   return (
     <>
-      <div className="previa-head">
-        <span className="titulo">Editais</span>
-        <span className="linha">
-          <span>Informática e TI</span>
-          <span>{data}, 7h</span>
-        </span>
-      </div>
       {editais.map((e) => (
         <Link key={e.id} href={editalHref(e.id)} className="previa-row">
           <span style={{ minWidth: 0 }}>
@@ -186,18 +175,30 @@ export default function Home() {
 
         <div className="hero-visual" aria-label="Prévia do e-mail diário">
           <div className="previa">
-            <Suspense fallback={<div style={{ height: 290 }} />}>
+            <div className="previa-head">
+              <span className="brand-mark">
+                <Icon name="radar" size={15} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <b>Editais novos para Informática e TI</b>
+                <small>Radar · hoje, 07:00</small>
+              </span>
+              <span className="tag accent">E-mail</span>
+            </div>
+            <Suspense fallback={<div style={{ height: 210 }} />}>
               <Previa />
             </Suspense>
           </div>
           <div className="previa-ia">
-            <span className="overline">Exemplo de resumo por IA</span>
+            <span className="row" style={{ gap: 8, color: "var(--sidebar-accent)", fontWeight: 600 }}>
+              <Icon name="file" size={15} /> Exemplo de resumo por IA
+            </span>
             <span className="row" style={{ gap: 6 }}>
               <span className="tag">Cota ME/EPP</span>
               <span className="tag">Sem garantia</span>
               <span className="tag">8 documentos</span>
             </span>
-            <span className="atencao">Atenção: amostra do produto em 3 dias úteis</span>
+            <span style={{ color: "#f7c9a6" }}>Atenção: amostra do produto em 3 dias úteis</span>
           </div>
         </div>
       </section>
@@ -217,8 +218,8 @@ export default function Home() {
         </div>
         <div className="grid g4 passos">
           {PASSOS.map((p, i) => (
-            <article key={p.titulo} className="passo">
-              <span className="n">{i + 1}</span>
+            <article key={p.titulo} className="card passo">
+              <span className="mono subtle">0{i + 1}</span>
               <h3>{p.titulo}</h3>
               <p>{p.texto}</p>
             </article>
