@@ -1,6 +1,8 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
+import { cacheLife } from "next/cache";
 import { connection } from "next/server";
 import { HBars } from "@/components/charts";
 import { Icon, type IconName } from "@/components/icons";
@@ -9,6 +11,8 @@ import { pool, query } from "@/lib/db";
 import { formatBRL, formatInt, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { analisar } from "@/lib/mercado";
 import { SETORES } from "@/lib/setores";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const PASSOS: { titulo: string; texto: string }[] = [
   {
@@ -36,7 +40,11 @@ const CONFIANCA: { icon: IconName; titulo: string; texto: string }[] = [
 ];
 
 /** Recent, still-open editais with a real budget: the landing's live proof. */
+// The landing's numbers are cached for an hour: they barely move between ingests, and computing them
+// on every visit (the market query is the heavy one) made the first request after idle take ~30s.
 async function recentes(limit: number, offset = 0) {
+  "use cache";
+  cacheLife("hours");
   return query<EditalLinha>(
     `select id, objeto, orgao, uf, municipio, modalidade, valor_estimado::float8 as valor_estimado, encerramento
      from editais where encerramento > now() + interval '2 days' and valor_estimado > 20000
@@ -45,14 +53,28 @@ async function recentes(limit: number, offset = 0) {
   );
 }
 
-async function Metricas() {
-  await connection();
+async function contagens() {
+  "use cache";
+  cacheLife("hours");
   const [m] = await query<{ abertas: string; hoje: string; contratos: string; orgaos: string }>(
     `select (select count(*) from editais where encerramento > now()) as abertas,
             (select count(*) from editais where publicado_em > now() - interval '24 hours') as hoje,
             (select count(*) from contratos where data_assinatura >= current_date - 30) as contratos,
             (select count(distinct cnpj) from editais where publicado_em > now() - interval '30 days') as orgaos`,
   );
+  return m;
+}
+
+async function topFornecedores() {
+  "use cache";
+  cacheLife("hours");
+  return (await analisar(pool(), { dias: 30 })).fornecedores.slice(0, 8);
+}
+
+async function Metricas() {
+  // Request-time only: the build has no database, so these must not be prerendered.
+  await connection();
+  const m = await contagens();
   return (
     <>
       <div>
@@ -111,7 +133,7 @@ async function Previa() {
 
 async function AoVivo() {
   await connection();
-  const [editais, mercado] = await Promise.all([recentes(5, 3), analisar(pool(), { dias: 30 })]);
+  const [editais, fornecedores] = await Promise.all([recentes(5, 3), topFornecedores()]);
   return (
     <div className="grid cols-main">
       <div className="card" style={{ overflow: "hidden" }}>
@@ -121,7 +143,7 @@ async function AoVivo() {
       </div>
       <div className="card card-pad stack">
         <h3>Quem mais vendeu ao governo (30 dias)</h3>
-        <HBars rows={mercado.fornecedores.slice(0, 8).map((f) => ({ ...f, nome: nome(f.nome) }))} href={(id) => `/fornecedor/${id}`} />
+        <HBars rows={fornecedores.map((f) => ({ ...f, nome: nome(f.nome) }))} href={(id) => `/fornecedor/${id}`} />
         <Link className="link small" href="/mercado">
           Ver quem compra e quem vence no seu mercado
         </Link>
@@ -132,7 +154,7 @@ async function AoVivo() {
 
 export default function Home() {
   return (
-    <main>
+    <main id="conteudo">
       <section className="hero container">
         <div className="hero-copy">
           <p className="overline">Para empresas que vendem ao governo, em todo o Brasil</p>
@@ -145,7 +167,7 @@ export default function Home() {
             <label htmlFor="hero-q">O que sua empresa vende?</label>
             <div className="searchbox">
               <Icon name="search" size={20} />
-              <input id="hero-q" name="q" placeholder="ex.: notebook, merenda escolar, reforma" />
+              <input id="hero-q" name="q" placeholder="ex.: notebook, merenda escolar" />
               <button className="btn btn-primary">Ver editais abertos</button>
             </div>
           </Form>

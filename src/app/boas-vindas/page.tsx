@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/session";
 import { Onboarding } from "./Onboarding";
 
-export const metadata: Metadata = { title: "Boas-vindas" };
+export const metadata: Metadata = { title: "Boas-vindas", robots: { index: false } };
 
 async function Conteudo() {
   const user = await requireUser();

@@ -41,7 +41,25 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 }
 
 export function Loading({ label = "Carregando…" }: { label?: string }) {
-  return <div className="page muted">{label}</div>;
+  return (
+    <div className="page" role="status" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <div className="page-head">
+        <div style={{ display: "grid", gap: 10 }}>
+          <span className="sk" style={{ width: 140, height: 12 }} />
+          <span className="sk" style={{ width: 240, height: 30 }} />
+        </div>
+      </div>
+      <div className="card" style={{ overflow: "hidden" }}>
+        {[70, 55, 80, 60].map((w) => (
+          <div key={w} className="sk-row">
+            <span className="sk" style={{ width: `${w}%`, height: 14 }} />
+            <span className="sk" style={{ width: `${w - 25}%`, height: 10 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export interface EditalLinha {

@@ -45,7 +45,7 @@ export function Onboarding({ email }: { email: string }) {
   }
 
   return (
-    <main className="onb">
+    <main id="conteudo" className="onb">
       <header className="onb-top">
         <Logo />
         <ol className="onb-passos" aria-label="Etapas">

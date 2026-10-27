@@ -5,7 +5,8 @@ RUN npm ci
 
 FROM deps AS build
 ARG BASE_PATH=""
-ENV BASE_PATH=$BASE_PATH
+ARG APP_URL=""
+ENV BASE_PATH=$BASE_PATH APP_URL=$APP_URL
 COPY . .
 RUN npx next build
 

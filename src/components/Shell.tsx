@@ -72,7 +72,7 @@ export function Shell({ user, children }: { user: ReactNode; children: ReactNode
         <div className="foot">{user}</div>
       </aside>
       <div className="scrim" onClick={() => setOpen(false)} />
-      <div className="main">
+      <div id="conteudo" className="main">
         <div className="topbar">
           <button className="btn btn-ghost" aria-label="Abrir menu" onClick={() => setOpen(true)}>
             <Icon name="menu" />

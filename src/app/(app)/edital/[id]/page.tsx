@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { AutoSelect } from "@/components/AutoSelect";
 import { SubmitButton } from "@/components/SubmitButton";
-import { EditalItem, Loading, type EditalLinha } from "@/components/ui";
+import { EditalItem, Loading, editalHref, type EditalLinha } from "@/components/ui";
 import { query } from "@/lib/db";
 import { formatBRL, formatCNPJ, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { fetchArquivos, pncpUrl, type EditalRow } from "@/lib/pncp";
@@ -16,11 +16,25 @@ import type { Resumo } from "@/lib/summary";
 import { adicionarAoPipeline, mudarEtapa, removerDoPipeline } from "../../../actions/pipeline";
 import { ResumoIA } from "./ResumoIA";
 
-export const metadata: Metadata = { title: "Edital" };
+type Edital = EditalRow & { valor_estimado: string | null };
+
+// Shared by the page and its metadata so the row is read once per request.
+const getEdital = cache(async (id: string) => (await query<Edital>(`select * from editais where id = $1`, [id]))[0]);
+
+export async function generateMetadata({ params }: PageProps<"/edital/[id]">): Promise<Metadata> {
+  const id = decodeURIComponent((await params).id);
+  const e = await getEdital(id);
+  if (!e) return { title: "Edital não encontrado" };
+  const title = tituloCurto(frase(e.objeto), 70);
+  const description = [
+    `${nome(e.orgao)}${e.uf ? `, ${e.uf}` : ""}`,
+    `Valor estimado: ${formatBRL(e.valor_estimado)}`,
+    `Propostas até ${formatData(e.encerramento)}`,
+  ].join(". ");
+  return { title, description, alternates: { canonical: editalHref(id) }, openGraph: { title, description } };
+}
 
 const ESFERA: Record<string, string> = { M: "Municipal", E: "Estadual", F: "Federal", D: "Distrital" };
-
-type Edital = EditalRow & { valor_estimado: string | null };
 
 async function Documentos({ e }: { e: Edital }) {
   let arquivos: Awaited<ReturnType<typeof fetchArquivos>> = [];
@@ -112,7 +126,7 @@ async function ResumoBloco({ e }: { e: Edital }) {
         <p className="muted">A IA lê o PDF do edital e extrai prazos, habilitação, exclusividade ME/EPP e pontos de atenção.</p>
         <div>
           <Link className="btn btn-primary" href="/entrar">
-            <Icon name="sparkles" size={14} /> Entre para resumir
+            <Icon name="file" size={14} /> Entre para resumir
           </Link>
         </div>
       </div>
@@ -124,7 +138,7 @@ async function ResumoBloco({ e }: { e: Edital }) {
 async function Edital({ params }: PageProps<"/edital/[id]">) {
   await connection();
   const id = decodeURIComponent((await params).id);
-  const [e] = await query<Edital>(`select * from editais where id = $1`, [id]);
+  const e = await getEdital(id);
   if (!e) notFound();
 
   const objeto = frase(e.objeto);

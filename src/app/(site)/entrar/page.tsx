@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -11,7 +12,7 @@ async function Erro({ searchParams }: PageProps<"/entrar">) {
 
 export default function Entrar(props: PageProps<"/entrar">) {
   return (
-    <main className="auth">
+    <main id="conteudo" className="auth">
       <div className="card">
         <div>
           <h1 style={{ fontSize: 20 }}>Entrar ou criar conta</h1>
@@ -23,6 +24,13 @@ export default function Entrar(props: PageProps<"/entrar">) {
           <Erro {...props} />
         </Suspense>
         <LoginForm />
+        <p className="subtle small">
+          Ao entrar você aceita a{" "}
+          <Link className="link" href="/privacidade">
+            política de privacidade
+          </Link>
+          .
+        </p>
       </div>
     </main>
   );

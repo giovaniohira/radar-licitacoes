@@ -13,7 +13,7 @@ import { requireUser } from "@/lib/session";
 import { alternarAlerta, excluirAlerta } from "../../actions/alertas";
 import { NovoAlerta } from "./NovoAlerta";
 
-export const metadata: Metadata = { title: "Alertas" };
+export const metadata: Metadata = { title: "Alertas", robots: { index: false } };
 
 interface AlertRow {
   id: number;

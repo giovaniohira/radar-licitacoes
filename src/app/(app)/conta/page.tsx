@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/session";
 import { excluirConta, sairDeTodos } from "../../actions/auth";
 import { TrocarEmail } from "./TrocarEmail";
 
-export const metadata: Metadata = { title: "Conta" };
+export const metadata: Metadata = { title: "Conta", robots: { index: false } };
 
 async function Conta({ searchParams }: PageProps<"/conta">) {
   const user = await requireUser();

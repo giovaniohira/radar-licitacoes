@@ -13,7 +13,7 @@ import { buildSearch, type EditalResumo } from "@/lib/search";
 import { requireUser } from "@/lib/session";
 import { adicionarAoPipeline, removerDoPipeline } from "../../actions/pipeline";
 
-export const metadata: Metadata = { title: "Hoje" };
+export const metadata: Metadata = { title: "Hoje", robots: { index: false } };
 
 interface AlertRow {
   id: number;
@@ -274,7 +274,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
         <section className="card inbox" aria-labelledby="inbox-h" style={{ overflow: "hidden" }}>
           <div className="inbox-head">
             <h2 id="inbox-h">
-              Novos nos seus alertas <span className="subtle" style={{ fontWeight: 500 }}>· últimas 24h</span>
+              Novos nos seus alertas <span className="subtle">· últimas 24h</span>
             </h2>
           </div>
           {alerts.length > 1 && (
