@@ -1,33 +1,27 @@
+import Link from "next/link";
+
 // Small inline icon set (24px grid, stroke icons), so the app ships no icon library.
 const PATHS = {
-  radar: "M19.07 4.93A10 10 0 1 0 22 12M12 12l7-7M16.24 7.76A6 6 0 1 0 18 12M12 12h.01",
-  home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
-  search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35",
-  kanban: "M4 4h4v16H4zM10 4h4v10h-4zM16 4h4v13h-4z",
-  bell: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0",
-  chart: "M3 3v18h18M7 15l4-4 3 3 5-6",
-  building: "M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M2 21h20M8 7h4M8 11h4M8 15h4",
-  briefcase: "M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18",
-  calendar: "M3 5h18v16H3zM16 3v4M8 3v4M3 10h18",
-  file: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6",
+  home: "M3 11 12 4l9 7M5 10v10h14V10",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5",
+  kanban: "M3 4h5v16H3zM10 4h5v10h-5zM17 4h4v13h-4z",
+  bell: "M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0",
+  chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  calendar: "M3 5h18v16H3zM3 10h18M8 3v4M16 3v4",
   external: "M14 4h6v6M10 14 20 4M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5",
   plus: "M12 5v14M5 12h14",
-  check: "M5 12l5 5L20 7",
-  x: "M18 6 6 18M6 6l12 12",
+  check: "m5 12 5 5L20 7",
+  x: "M6 6l12 12M18 6 6 18",
   menu: "M4 6h16M4 12h16M4 18h16",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
-  arrowRight: "M5 12h14M13 5l7 7-7 7",
-  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
-  mail: "M3 5h18v14H3zM3 6l9 7 9-7",
-  list: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
-  pause: "M8 5v14M16 5v14",
-  play: "M7 4l13 8-13 8z",
-  trash: "M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14",
+  arrowRight: "M5 12h14M13 6l6 6-6 6",
+  sparkle: "M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8zM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z",
+  copy: "M9 9h11v11H9zM5 15H4V4h11v1",
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
-export function Icon({ name, size = 16, className }: { name: IconName; size?: number; className?: string }) {
+export function Icon({ name, size = 16, className, strokeWidth = 2 }: { name: IconName; size?: number; className?: string; strokeWidth?: number }) {
   return (
     <svg
       width={size}
@@ -35,7 +29,7 @@ export function Icon({ name, size = 16, className }: { name: IconName; size?: nu
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.8}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
@@ -46,13 +40,27 @@ export function Icon({ name, size = 16, className }: { name: IconName; size?: nu
   );
 }
 
-export function Logo() {
+/** The "R construído" mark: stem, orange bowl, leg. Colors are fixed, it always sits on navy. */
+export function Mark({ size = 18 }: { size?: number }) {
   return (
-    <span className="brand">
-      <span className="brand-mark">
-        <Icon name="radar" size={16} />
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
+      <rect x="6" y="5" width="6.5" height="22" rx="1" fill="#FFFFFF" />
+      <path d="M12.5 5H16a6.5 6.5 0 0 1 0 13h-3.5z" fill="#F97316" />
+      <path d="M13.5 18 26 27H17.5z" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
+/** Mark + "radar" wordmark; `completo` adds "licitações" (public site and sign-in). */
+export function Logo({ href = "/", completo = false }: { href?: string; completo?: boolean }) {
+  return (
+    <Link href={href} className="logo" aria-label="Radar de Licitações, página inicial">
+      <span className="logo-mark">
+        <Mark />
       </span>
-      Radar
-    </span>
+      <span className="logo-word">
+        radar{completo && <small> licitações</small>}
+      </span>
+    </Link>
   );
 }

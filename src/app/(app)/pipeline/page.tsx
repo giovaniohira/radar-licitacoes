@@ -3,71 +3,66 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
-import { Empty, Loading, PageHead, PrazoBadge, editalHref } from "@/components/ui";
-import { icsToken } from "@/lib/auth";
+import { Empty, Loading, PageHead, PrazoPill, editalHref, valorCurto } from "@/components/ui";
 import { pool } from "@/lib/db";
-import { formatBRL, formatData, frase, local, nome } from "@/lib/format";
+import { formatBRLCompact, formatData, formatInt, frase, nome, tituloCurto } from "@/lib/format";
 import { first } from "@/lib/params";
-import { ETAPAS, etapaLabel, listPipeline } from "@/lib/pipeline";
+import { etapaLabel, listPipeline } from "@/lib/pipeline";
 import { requireUser } from "@/lib/session";
 import { Board } from "./Board";
 
-export const metadata: Metadata = { title: "Pipeline", robots: { index: false } };
+export const metadata: Metadata = { title: "Minhas disputas", robots: { index: false } };
+
+const EM_DISPUTA = ["triagem", "analise", "preparando", "enviada"];
 
 async function Pipeline({ searchParams }: PageProps<"/pipeline">) {
   await connection();
   const user = await requireUser();
   const lista = first((await searchParams).view) === "lista";
   const itens = await listPipeline(pool(), user.id);
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  const ics = `${appUrl}/pipeline.ics?u=${user.id}&t=${icsToken(user.id)}`;
+  const ativos = itens.filter((i) => EM_DISPUTA.includes(i.etapa));
+  const valor = ativos.reduce((s, i) => s + (i.valor_proposta ?? i.valor_estimado ?? 0), 0);
 
   return (
-    <div className="page" style={{ maxWidth: "none" }}>
+    <div className="page wide" style={{ gap: 20 }}>
       <PageHead
-        title="Pipeline de propostas"
-        sub="Arraste os cards entre as etapas. Clique em um card para checklist, notas e valor da proposta."
+        title="Minhas disputas"
+        sub={
+          itens.length
+            ? `${valor ? formatBRLCompact(valor) : "R$ 0"} em ${formatInt(ativos.length)} ${ativos.length === 1 ? "edital" : "editais"}. Arraste o cartão quando mudar de etapa.`
+            : "Os editais em que você tem interesse ficam aqui, da triagem ao resultado."
+        }
         actions={
           <>
-            <div className="seg">
-              <Link href="/pipeline" aria-current={!lista}>
+            <div className="seg" role="tablist" aria-label="Visualização">
+              <Link href="/pipeline" aria-current={lista ? undefined : "true"}>
                 Quadro
               </Link>
-              <Link href="/pipeline?view=lista" aria-current={lista}>
-                Lista por prazo
+              <Link href="/pipeline?view=lista" aria-current={lista ? "true" : undefined}>
+                Lista
               </Link>
             </div>
-            <details style={{ position: "relative" }}>
-              <summary className="btn" style={{ listStyle: "none" }}>
-                <Icon name="calendar" size={14} /> Agenda
-              </summary>
-              <div className="card card-body stack" style={{ position: "absolute", right: 0, top: 38, width: 340, zIndex: 5 }}>
-                <p className="small">Assine este endereço no Google Agenda (Outras agendas → Do URL) para ver os prazos com lembrete 1 dia antes.</p>
-                <input className="input mono" readOnly value={ics} aria-label="Endereço da agenda" />
-              </div>
-            </details>
+            <Link className="btn" href="/conta#agenda">
+              <Icon name="calendar" size={15} /> Sincronizar agenda
+            </Link>
           </>
         }
       />
       {itens.length === 0 ? (
         <div className="card">
-          <Empty title="Seu pipeline está vazio">
-            Abra um edital na{" "}
-            <Link className="link" href="/buscar">
-              busca
-            </Link>{" "}
-            e clique em “Adicionar ao pipeline”.
+          <Empty title="Nenhuma disputa ainda">
+            Em <Link href="/buscar">Encontrar editais</Link>, clique em “Tenho interesse” num edital e ele aparece aqui.
           </Empty>
         </div>
       ) : lista ? (
-        <div className="card table-wrap">
+        <div className="card table-scroll">
           <table className="table">
             <thead>
               <tr>
                 <th>Edital</th>
                 <th>Etapa</th>
                 <th className="r">Valor</th>
-                <th>Checklist</th>
+                <th>Documentos</th>
                 <th>Propostas até</th>
               </tr>
             </thead>
@@ -77,21 +72,22 @@ async function Pipeline({ searchParams }: PageProps<"/pipeline">) {
                 .map((i) => (
                   <tr key={i.edital_id}>
                     <td style={{ maxWidth: 520 }}>
-                      <Link className="title clamp2" href={editalHref(i.edital_id)}>
-                        {frase(i.objeto)}
+                      <Link className="t" href={editalHref(i.edital_id)} style={{ color: "var(--text)" }}>
+                        {tituloCurto(frase(i.objeto))}
                       </Link>
-                      <div className="sub">
-                        {nome(i.orgao)} · {local(i.municipio, i.uf)}
+                      <div className="m">
+                        {nome(i.orgao)}
+                        {i.uf && ` · ${i.uf}`}
                       </div>
                     </td>
                     <td>
-                      <span className="badge plain">{etapaLabel(i.etapa)}</span>
+                      <span className="pill">{etapaLabel(i.etapa)}</span>
                     </td>
-                    <td className="r num nowrap">{formatBRL(i.valor_proposta ?? i.valor_estimado)}</td>
-                    <td className="num">{i.check_total ? `${i.check_feito}/${i.check_total}` : "—"}</td>
+                    <td className="r num nowrap">{valorCurto(i.valor_proposta ?? i.valor_estimado)}</td>
+                    <td className="num">{i.check_total ? `${i.check_feito} de ${i.check_total}` : "—"}</td>
                     <td className="nowrap">
                       <div className="num">{formatData(i.encerramento)}</div>
-                      <PrazoBadge d={i.encerramento} />
+                      {i.encerramento && <PrazoPill d={i.encerramento} />}
                     </td>
                   </tr>
                 ))}
@@ -99,7 +95,7 @@ async function Pipeline({ searchParams }: PageProps<"/pipeline">) {
           </table>
         </div>
       ) : (
-        <Board etapas={ETAPAS.map((e) => ({ ...e }))} inicial={itens} />
+        <Board inicial={itens} />
       )}
     </div>
   );

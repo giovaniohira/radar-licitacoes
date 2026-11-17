@@ -6,19 +6,17 @@ export const metadata: Metadata = { title: "Página não encontrada", robots: { 
 
 export default function NotFound() {
   return (
-    <main id="conteudo" className="auth">
-      <div className="card" style={{ textAlign: "center" }}>
-        <div>
-          <Logo />
-        </div>
-        <h1 style={{ fontSize: 20 }}>Página não encontrada</h1>
+    <main id="conteudo" className="centro">
+      <div className="card">
+        <Logo completo />
+        <h1 style={{ fontSize: 22 }}>Página não encontrada</h1>
         <p className="muted small">O edital, órgão ou fornecedor pode não estar mais no PNCP ou o endereço está incompleto.</p>
         <div className="row" style={{ justifyContent: "center" }}>
           <Link className="btn" href="/">
             Página inicial
           </Link>
           <Link className="btn btn-primary" href="/buscar">
-            Buscar editais
+            Encontrar editais
           </Link>
         </div>
       </div>

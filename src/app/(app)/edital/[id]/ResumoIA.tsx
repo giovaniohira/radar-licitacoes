@@ -5,111 +5,103 @@ import { Icon } from "@/components/icons";
 import type { Resumo } from "@/lib/summary";
 import { resumir, type ResumoState } from "../../../actions/resumo";
 
-function Cabecalho({ children }: { children?: ReactNode }) {
+function Cabecalho({ sub }: { sub: string }) {
   return (
-    <div className="card-head">
-      <div className="row" style={{ gap: 10 }}>
-        <span className="ia-mark">
-          <Icon name="file" />
-        </span>
-        <h2>Resumo do edital</h2>
+    <div className="ia-head">
+      <div className="row">
+        <Icon name="sparkle" size={18} />
+        <h2>O que você precisa saber</h2>
       </div>
-      {children}
+      <p>{sub}</p>
     </div>
   );
 }
 
-function ResumoView({ r, documento }: { r: Resumo; documento?: string }) {
+function Pergunta({ p, alerta, children }: { p: string; alerta?: boolean; children: ReactNode }) {
   return (
-    <section className="card">
-      <Cabecalho>
-        <span className="xs subtle">Feito por IA a partir do PDF. Confira os pontos críticos no edital.</span>
-      </Cabecalho>
-      <div className="card-body stack-lg">
-        <p className="ia-frase">{r.objeto}</p>
-        <dl className="ia-fatos">
-          <div>
-            <dt>ME/EPP</dt>
-            <dd>{r.exclusivo_me_epp ? "Exclusivo ou cota reservada" : "Ampla concorrência"}</dd>
-          </div>
-          <div>
-            <dt>Julgamento</dt>
-            <dd>{r.criterio_julgamento}</dd>
-          </div>
-          <div>
-            <dt>Garantia</dt>
-            <dd>{r.garantia}</dd>
-          </div>
-          <div>
-            <dt>Valor</dt>
-            <dd>{r.valor_estimado}</dd>
-          </div>
-        </dl>
-        <div className="grid g2" style={{ gap: 28 }}>
-          {r.pontos_de_atencao.length > 0 && (
-            <div className="stack" style={{ gap: 8 }}>
-              <h3 className="overline urgente">Pontos de atenção</h3>
-              <ul className="ia-alertas">
-                {r.pontos_de_atencao.map((x, i) => (
-                  <li key={i}>{x}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {r.prazos.length > 0 && (
-            <div className="stack" style={{ gap: 8 }}>
-              <h3 className="overline">Datas</h3>
-              <ol className="ia-datas">
-                {r.prazos.map((p, i) => (
-                  <li key={i}>
-                    <span className="num">{p.data}</span>
-                    {p.evento}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-        </div>
-        <div className="stack" style={{ gap: 8 }}>
-          <h3 className="overline">Documentos de habilitação</h3>
-          <ul className="list small">
-            {r.exigencias_habilitacao.map((x, i) => (
+    <div className={`qa${alerta ? " alerta" : ""}`}>
+      <span className="mk" aria-hidden>
+        {alerta ? "!" : "?"}
+      </span>
+      <div>
+        <h3>{p}</h3>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ResumoView({ r, documento, detalhes }: { r: Resumo; documento?: string; detalhes: ReactNode }) {
+  return (
+    <section className="card" style={{ overflow: "hidden" }}>
+      <Cabecalho sub="A IA leu o PDF do edital. Confira no original antes de enviar." />
+      <Pergunta p="O que estão comprando?">
+        <p>{r.objeto}</p>
+      </Pergunta>
+      <Pergunta p="Posso participar como ME/EPP?">
+        <p>{r.exclusivo_me_epp ? "Sim. Há participação exclusiva ou cota reservada para micro e pequenas empresas." : "Não há cota exclusiva: a disputa é de ampla concorrência."}</p>
+      </Pergunta>
+      <Pergunta p="Tem alguma pegadinha?" alerta={r.pontos_de_atencao.length > 0}>
+        {r.pontos_de_atencao.length ? (
+          <ul>
+            {r.pontos_de_atencao.map((x, i) => (
               <li key={i}>{x}</li>
             ))}
           </ul>
-          <p className="xs subtle">Ao acompanhar no pipeline, esta lista vira o checklist do card.</p>
-        </div>
-        <p className="xs subtle">
-          Entrega e execução: {r.local_entrega_execucao}.{" "}
-          {documento && (
-            <a className="link" href={documento} target="_blank" rel="noreferrer">
-              Abrir o documento lido
-            </a>
-          )}
+        ) : (
+          <p>Nenhum ponto de atenção encontrado no edital.</p>
+        )}
+      </Pergunta>
+      {r.prazos.length > 0 && (
+        <Pergunta p="Quais são as datas?">
+          <ul>
+            {r.prazos.map((p, i) => (
+              <li key={i}>
+                <span className="num">{p.data}</span> · {p.evento}
+              </li>
+            ))}
+          </ul>
+        </Pergunta>
+      )}
+      <Pergunta p="Onde entregar e qual garantia?">
+        <p>
+          {r.local_entrega_execucao}. Garantia: {r.garantia}. Ganha quem: {r.criterio_julgamento}.
         </p>
+      </Pergunta>
+      <div className="ia-foot">
+        {documento && (
+          <a href={documento} target="_blank" rel="noreferrer">
+            Abrir o documento que a IA leu
+          </a>
+        )}
+        {detalhes}
       </div>
     </section>
   );
 }
 
-export function ResumoIA({ editalId, inicial }: { editalId: string; inicial: ResumoState }) {
+export function ResumoIA({ editalId, inicial, logado, detalhes }: { editalId: string; inicial: ResumoState; logado: boolean; detalhes: ReactNode }) {
   const [state, action, pending] = useActionState(resumir, inicial);
-  if (state?.resumo) return <ResumoView r={state.resumo} documento={state.documento} />;
+  if (state?.resumo) return <ResumoView r={state.resumo} documento={state.documento} detalhes={detalhes} />;
   return (
-    <form action={action} className="card">
-      <Cabecalho />
-      <div className="card-body stack">
-        <input type="hidden" name="edital" value={editalId} />
-        <p className="muted">
-          A IA lê o PDF do edital e devolve prazos, documentos de habilitação, cota ME/EPP, garantia e as armadilhas para uma empresa pequena.
-        </p>
-        <div>
-          <button type="submit" className="btn btn-primary" disabled={pending}>
-            <Icon name="file" size={14} /> {pending ? "Lendo o edital… (até 1 min)" : "Resumir edital com IA"}
-          </button>
-        </div>
-        {state?.error && <div className="notice danger">{state.error}</div>}
+    <section className="card" style={{ overflow: "hidden" }}>
+      <Cabecalho sub="A IA lê o PDF do edital e responde: prazos, documentos de habilitação, cota ME/EPP, garantia e as pegadinhas." />
+      <div className="ia-foot" style={{ paddingBlock: 16 }}>
+        {logado ? (
+          <form action={action}>
+            <input type="hidden" name="edital" value={editalId} />
+            <button type="submit" className="btn btn-primary" disabled={pending}>
+              <Icon name="sparkle" size={15} /> {pending ? "Lendo o edital… (até 1 min)" : "Resumir edital com IA"}
+            </button>
+          </form>
+        ) : (
+          <a className="btn btn-primary" href="/entrar" style={{ width: "fit-content" }}>
+            Entre para resumir com IA
+          </a>
+        )}
+        {state?.error && <div className="notice">{state.error}</div>}
+        {detalhes}
       </div>
-    </form>
+    </section>
   );
 }

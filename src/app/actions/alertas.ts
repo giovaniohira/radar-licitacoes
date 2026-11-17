@@ -22,9 +22,15 @@ function parseAlerta(form: FormData) {
   return { nome: nome || palavras.split(/[,;\n]/)[0].trim().slice(0, 60), palavras, ufs, modalidades, valorMin, valorMax };
 }
 
-async function inserir(userId: number, a: ReturnType<typeof parseAlerta>): Promise<string | null> {
+function invalido(a: ReturnType<typeof parseAlerta>): string | null {
   if (!a.palavras) return "Informe ao menos uma palavra-chave.";
   if (a.valorMin != null && a.valorMax != null && a.valorMin > a.valorMax) return "O valor mínimo é maior que o máximo.";
+  return null;
+}
+
+async function inserir(userId: number, a: ReturnType<typeof parseAlerta>): Promise<string | null> {
+  const erro = invalido(a);
+  if (erro) return erro;
   const [{ n }] = await query<{ n: string }>(`select count(*) as n from alerts where user_id = $1`, [userId]);
   if (Number(n) >= MAX_ALERTAS) return `Limite de ${MAX_ALERTAS} alertas.`;
   await query(
@@ -39,6 +45,19 @@ export async function criarAlerta(_: FormState, form: FormData): Promise<FormSta
   const user = await requireUser();
   const error = await inserir(user.id, parseAlerta(form));
   return error ? { error } : { ok: "Alerta criado. O primeiro resumo chega no próximo envio diário, às 7h." };
+}
+
+export async function atualizarAlerta(_: FormState, form: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const a = parseAlerta(form);
+  const error = invalido(a);
+  if (error) return { error };
+  await query(
+    `update alerts set nome = $3, palavras = $4, ufs = $5, modalidades = $6, valor_min = $7, valor_max = $8 where id = $1 and user_id = $2`,
+    [Number(form.get("id")), user.id, a.nome, a.palavras, a.ufs, a.modalidades, a.valorMin, a.valorMax],
+  );
+  revalidatePath("/alertas");
+  redirect("/alertas?salvo=editado");
 }
 
 /** "Salvar como alerta" from the search page: the current filters arrive as hidden fields. */

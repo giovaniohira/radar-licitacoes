@@ -1,69 +1,40 @@
 import Link from "next/link";
-import { Icon, Logo } from "@/components/icons";
-
-const LINKS = [
-  { href: "/#como", label: "Como funciona" },
-  { href: "/buscar", label: "Buscar editais" },
-  { href: "/mercado", label: "Mercado" },
-];
+import { Logo } from "@/components/icons";
 
 export default function SiteLayout({ children }: LayoutProps<"/">) {
   return (
-    <>
-      <header className="site-nav">
+    <div className="landing">
+      <header className="site-head">
         <div className="container">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <nav>
-            {LINKS.map((l) => (
-              <Link key={l.href} className="btn btn-ghost hide-sm" href={l.href}>
-                {l.label}
-              </Link>
-            ))}
-            <Link className="btn btn-ghost hide-sm" href="/entrar">
+          <Logo completo />
+          <nav aria-label="Site">
+            <Link href="/#como">Como funciona</Link>
+            <Link href="/#hoje">O Radar hoje</Link>
+            <Link href="/#email">E-mail diário</Link>
+          </nav>
+          <div className="acts">
+            <Link className="btn btn-ghost" href="/entrar" style={{ color: "var(--text)" }}>
               Entrar
             </Link>
             <Link className="btn btn-primary" href="/entrar">
-              Criar meu alerta
+              Começar agora
             </Link>
-            {/* Phones get the hidden links in a native disclosure, no JS needed. */}
-            <details className="site-menu">
-              <summary className="btn btn-ghost" aria-label="Menu">
-                <Icon name="menu" size={18} />
-              </summary>
-              <div className="card">
-                {LINKS.map((l) => (
-                  <Link key={l.href} href={l.href}>
-                    {l.label}
-                  </Link>
-                ))}
-                <Link href="/entrar">Entrar</Link>
-              </div>
-            </details>
-          </nav>
+          </div>
         </div>
       </header>
       {children}
-      <footer className="site-footer">
-        <div className="container spread">
+      <footer className="site-foot">
+        <div className="container">
           <span>
-            Dados públicos do{" "}
-            <a className="link" href="https://pncp.gov.br" target="_blank" rel="noreferrer">
-              Portal Nacional de Contratações Públicas
+            Radar de Licitações · dados públicos do{" "}
+            <a href="https://pncp.gov.br" target="_blank" rel="noreferrer">
+              PNCP
             </a>
-            . Sem vínculo com o governo; confira sempre o edital original.
+            , sem vínculo com o governo
           </span>
-          <span className="row" style={{ gap: 16 }}>
-            <Link className="link" href="/privacidade">
-              Privacidade
-            </Link>
-            <a className="link" href="https://github.com/giovaniohira/radar-licitacoes" target="_blank" rel="noreferrer">
-              Código no GitHub
-            </a>
-          </span>
+          <Link href="/privacidade">Privacidade</Link>
         </div>
       </footer>
-    </>
+    </div>
   );
 }

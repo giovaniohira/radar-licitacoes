@@ -1,55 +1,46 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import Form from "next/form";
 import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { connection } from "next/server";
-import { HBars } from "@/components/charts";
-import { Icon, type IconName } from "@/components/icons";
-import { EditalItem, editalHref, type EditalLinha } from "@/components/ui";
-import { pool, query } from "@/lib/db";
-import { formatBRL, formatInt, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
-import { analisar } from "@/lib/mercado";
-import { SETORES } from "@/lib/setores";
+import { Icon } from "@/components/icons";
+import { editalHref, type EditalLinha } from "@/components/ui";
+import { query } from "@/lib/db";
+import { formatBRLCompact, formatDia, formatInt, frase, nome, tituloCurto } from "@/lib/format";
+import { LoginForm } from "../entrar/LoginForm";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
-const PASSOS: { titulo: string; texto: string }[] = [
-  {
-    titulo: "Diga o que você vende",
-    texto: "Do jeito que você fala: “merenda escolar”, “reforma de telhado”. Com ou sem acento, a busca cobre todos os editais abertos do país.",
-  },
-  {
-    titulo: "Receba só o que é novo",
-    texto: "Às 7h chega um e-mail com o que saiu desde ontem. Nada repetido, nenhum portal para abrir.",
-  },
-  {
-    titulo: "Decida sem ler o PDF inteiro",
-    texto: "A IA lê o edital e mostra prazos, documentos exigidos, cota ME/EPP, garantia e o que pode desclassificar você.",
-  },
-  {
-    titulo: "Não perca nenhum prazo",
-    texto: "Cada disputa vira um card com checklist de documentos, e os prazos aparecem no seu Google Agenda.",
-  },
+const RECURSOS = [
+  { t: "Receba só o que é novo", d: "Um e-mail por dia com os editais que você ainda não viu. Nada de buscar de novo amanhã." },
+  { t: "Decida sem ler o PDF inteiro", d: "A IA lê o edital e responde o que importa: prazos, habilitação, cota ME/EPP e pegadinhas." },
+  { t: "Não perca nenhum prazo", d: "Suas disputas num quadro, com checklist de documentos e lembrete na sua agenda." },
+  { t: "Direto da fonte oficial", d: "Tudo vem do PNCP, de órgãos federais, estaduais e municipais do Brasil inteiro." },
 ];
 
-const CONFIANCA: { icon: IconName; titulo: string; texto: string }[] = [
-  { icon: "building", titulo: "Direto da fonte oficial", texto: "Lemos o PNCP, o portal federal de compras, 3 vezes por dia. Todo edital tem o link para o original." },
-  { icon: "mail", titulo: "Sem senha", texto: "Você entra por um link de uso único no seu e-mail. Não há senha para esquecer nem para vazar." },
-  { icon: "check", titulo: "CPF fica de fora", texto: "Contratos com pessoa física aparecem sem nome e sem CPF, e nunca entram em rankings." },
+const PASSOS = [
+  { t: "Diga o que você vende", d: "Escolha seu ramo. A busca já vem com as palavras que os órgãos usam, e você ajusta depois." },
+  { t: "Receba só o que combina", d: "Todo dia às 7h, os editais novos do seu ramo e dos seus estados no e-mail." },
+  { t: "Marque o que interessa", d: "O edital vai para Minhas disputas com resumo, checklist e prazo na agenda." },
 ];
 
-/** Recent, still-open editais with a real budget: the landing's live proof. */
+// Illustration of the Hoje screen in the hero; the real one is built from the user's data.
+const MOCK = [
+  { n: 1, t: "Juntar 3 documentos dos notebooks", s: "prazo quarta, 10h", urg: true },
+  { n: 2, t: "Revisar os editais novos do seu ramo", s: "chegaram desde ontem" },
+  { n: 3, t: "Decidir sobre os tablets", s: "o resumo da IA já está pronto" },
+];
+
 // The landing's numbers are cached for an hour: they barely move between ingests, and computing them
-// on every visit (the market query is the heavy one) made the first request after idle take ~30s.
-async function recentes(limit: number, offset = 0) {
+// on every visit made the first request after idle slow.
+async function recentes(limit: number) {
   "use cache";
   cacheLife("hours");
   return query<EditalLinha>(
     `select id, objeto, orgao, uf, municipio, modalidade, valor_estimado::float8 as valor_estimado, encerramento
      from editais where encerramento > now() + interval '2 days' and valor_estimado > 20000
-     order by publicado_em desc limit $1 offset $2`,
-    [limit, offset],
+     order by publicado_em desc limit $1`,
+    [limit],
   );
 }
 
@@ -65,34 +56,23 @@ async function contagens() {
   return m;
 }
 
-async function topFornecedores() {
-  "use cache";
-  cacheLife("hours");
-  return (await analisar(pool(), { dias: 30 })).fornecedores.slice(0, 8);
-}
-
-async function Metricas() {
+async function Numeros() {
   // Request-time only: the build has no database, so these must not be prerendered.
   await connection();
   const m = await contagens();
   return (
     <>
-      <div>
-        <b>{formatInt(m.abertas)}</b>
-        <span>licitações abertas agora</span>
-      </div>
-      <div>
-        <b>{formatInt(m.hoje)}</b>
-        <span>publicadas nas últimas 24h</span>
-      </div>
-      <div>
-        <b>{formatInt(m.contratos)}</b>
-        <span>contratos assinados em 30 dias</span>
-      </div>
-      <div>
-        <b>{formatInt(m.orgaos)}</b>
-        <span>órgãos comprando</span>
-      </div>
+      {[
+        [m.abertas, "licitações abertas agora"],
+        [m.hoje, "publicadas nas últimas 24h"],
+        [m.contratos, "contratos assinados em 30 dias"],
+        [m.orgaos, "órgãos comprando"],
+      ].map(([v, l]) => (
+        <div key={l}>
+          <b>{formatInt(v)}</b>
+          <span>{l}</span>
+        </div>
+      ))}
     </>
   );
 }
@@ -100,186 +80,116 @@ async function Metricas() {
 async function Previa() {
   await connection();
   const editais = await recentes(3);
-  return (
-    <>
-      {editais.map((e) => (
-        <Link key={e.id} href={editalHref(e.id)} className="previa-row">
-          <span style={{ minWidth: 0 }}>
-            <b>{tituloCurto(frase(e.objeto), 60)}</b>
-            <small>
-              {nome(e.orgao)}, {e.uf}
-            </small>
-          </span>
-          <span className="r">
-            <b className="num">{formatBRL(e.valor_estimado)}</b>
-            <small className={prazoTom(e.encerramento) === "warn" ? "urgente" : undefined}>{prazo(e.encerramento)}</small>
-          </span>
-        </Link>
-      ))}
-    </>
-  );
-}
-
-async function AoVivo() {
-  await connection();
-  const [editais, fornecedores] = await Promise.all([recentes(5, 3), topFornecedores()]);
-  return (
-    <div className="grid cols-main">
-      <div className="card" style={{ overflow: "hidden" }}>
-        {editais.map((e) => (
-          <EditalItem key={e.id} e={e} />
-        ))}
-      </div>
-      <div className="card card-pad stack">
-        <h3>Quem mais vendeu ao governo (30 dias)</h3>
-        <HBars rows={fornecedores.map((f) => ({ ...f, nome: nome(f.nome) }))} href={(id) => `/fornecedor/${id}`} />
-        <Link className="link small" href="/mercado">
-          Ver quem compra e quem vence no seu mercado
-        </Link>
-      </div>
-    </div>
-  );
+  return editais.map((e) => (
+    <Link key={e.id} href={editalHref(e.id)}>
+      <b>{tituloCurto(frase(e.objeto), 70)}</b>
+      <small>
+        {nome(e.orgao)} · {e.uf} · {formatBRLCompact(e.valor_estimado)} · propostas até {formatDia(e.encerramento)}
+      </small>
+    </Link>
+  ));
 }
 
 export default function Home() {
   return (
     <main id="conteudo">
-      <section className="hero container">
+      <section className="container hero">
         <div className="hero-copy">
-          <p className="overline">Para empresas que vendem ao governo, em todo o Brasil</p>
+          <span className="eyebrow-pill">Para empresas que vendem ao governo, em todo o Brasil</span>
           <h1>Nunca mais perca um edital que sua empresa podia ganhar.</h1>
-          <p className="lead">
-            Pare de garimpar portal. Às 7h, o Radar manda só os editais que combinam com o que você vende, já resumidos por IA, para você
-            decidir em minutos se vale disputar.
-          </p>
-          <Form action="/buscar" className="hero-form">
-            <label htmlFor="hero-q">O que sua empresa vende?</label>
-            <div className="searchbox">
-              <Icon name="search" size={20} />
-              <input id="hero-q" name="q" placeholder="ex.: notebook, merenda escolar" />
-              <button className="btn btn-primary">Ver editais abertos</button>
-            </div>
-          </Form>
-          <div className="row" style={{ gap: 8 }}>
-            <span className="small subtle">Ou comece pelo setor:</span>
-            {SETORES.slice(0, 5).map((s) => (
-              <Link key={s.id} className="chip-btn" href={`/buscar?q=${encodeURIComponent(s.palavras)}`}>
-                {s.nome}
-              </Link>
-            ))}
-            <a className="chip-btn" href="#setores">
-              Mais setores
-            </a>
-          </div>
+          <p className="lead">Todo dia às 7h, os editais novos do seu ramo no seu e-mail. A IA lê o PDF por você, e o Radar lembra dos prazos.</p>
+          <LoginForm variante="hero" />
+          <p className="small subtle">Sem senha e sem cartão. Você entra pelo link que chega no e-mail.</p>
         </div>
 
-        <div className="hero-visual" aria-label="Prévia do e-mail diário">
-          <div className="previa">
-            <div className="previa-head">
-              <span className="brand-mark">
-                <Icon name="radar" size={15} />
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <b>Editais novos para Informática e TI</b>
-                <small>Radar · hoje, 07:00</small>
-              </span>
-              <span className="tag accent">E-mail</span>
+        <div className="hero-mock" aria-hidden>
+          <div className="xs subtle">Hoje</div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 650, letterSpacing: "-0.02em" }}>Bom dia. Você tem 3 coisas pra hoje.</div>
+          <div className="card" style={{ overflow: "hidden" }}>
+            {MOCK.map((t) => (
+              <div key={t.n} className={`task${t.urg ? " urg" : ""}`}>
+                <span className="n">{t.n}</span>
+                <div className="body" style={{ flexBasis: 0, flexGrow: 1 }}>
+                  <div className="t">{t.t}</div>
+                  <p>{t.s}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="card card-pad stack" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 6, fontSize: 12, fontWeight: 600, color: "var(--brand-text)" }}>
+              <Icon name="sparkle" size={14} /> Resumo por IA
             </div>
-            <Suspense fallback={<div style={{ height: 210 }} />}>
-              <Previa />
+            <div className="small" style={{ fontWeight: 600 }}>
+              Tem alguma pegadinha?
+            </div>
+            <div className="small muted">Amostra do produto em até 3 dias úteis após a convocação.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="hoje" className="band" aria-label="O Radar hoje">
+        <div className="container">
+          <div className="spread">
+            <h2>O Radar hoje</h2>
+            <span className="small subtle">Números reais, direto do banco do Radar, atualizados todo dia.</span>
+          </div>
+          <div className="numeros">
+            <Suspense fallback={<div style={{ height: 88 }} />}>
+              <Numeros />
             </Suspense>
           </div>
-          <div className="previa-ia">
-            <span className="row" style={{ gap: 8, color: "var(--sidebar-accent)", fontWeight: 600 }}>
-              <Icon name="file" size={15} /> Exemplo de resumo por IA
-            </span>
-            <span className="row" style={{ gap: 6 }}>
-              <span className="tag">Cota ME/EPP</span>
-              <span className="tag">Sem garantia</span>
-              <span className="tag">8 documentos</span>
-            </span>
-            <span style={{ color: "#f7c9a6" }}>Atenção: amostra do produto em 3 dias úteis</span>
-          </div>
         </div>
       </section>
 
-      <section className="metrics-band" aria-label="O Radar hoje">
-        <div className="container metrics">
-          <Suspense fallback={<div style={{ height: 88 }} />}>
-            <Metricas />
-          </Suspense>
-        </div>
-      </section>
-
-      <section id="como" className="section container">
-        <div className="section-head">
-          <p className="overline">Como funciona</p>
-          <h2>Do edital publicado à proposta enviada, sem planilha.</h2>
-        </div>
-        <div className="grid g4 passos">
-          {PASSOS.map((p, i) => (
-            <article key={p.titulo} className="card passo">
-              <span className="mono subtle">0{i + 1}</span>
-              <h3>{p.titulo}</h3>
-              <p>{p.texto}</p>
+      <section className="container landing-sec">
+        <h2 className="big-h">Do edital publicado à proposta enviada, sem planilha.</h2>
+        <div className="recursos">
+          {RECURSOS.map((r, i) => (
+            <article key={r.t}>
+              <span className="n">{i + 1}</span>
+              <h3>{r.t}</h3>
+              <p>{r.d}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="section container">
-        <div className="section-head spread" style={{ maxWidth: "none", alignItems: "flex-end" }}>
-          <div>
-            <h2>O que saiu nas últimas horas</h2>
-            <p>Editais e contratos reais, direto do banco do Radar. É isso que chega no seu e-mail. Nada aqui é exemplo.</p>
+      <section id="como" className="band como">
+        <div className="container">
+          <div className="como-passos">
+            <h2>Como funciona</h2>
+            {PASSOS.map((p, i) => (
+              <div key={p.t} className="p">
+                <span className="n">{i + 1}</span>
+                <div>
+                  <h3>{p.t}</h3>
+                  <p>{p.d}</p>
+                </div>
+              </div>
+            ))}
           </div>
-          <Link className="link" href="/buscar">
-            Ver todos os editais abertos
-          </Link>
+          <div id="email" className="email-previa">
+            <div className="h">
+              <div>
+                <strong>Radar · hoje, 07:00</strong>
+              </div>
+              <div>Editais novos para o seu ramo</div>
+            </div>
+            <Suspense fallback={<div style={{ height: 210 }} />}>
+              <Previa />
+            </Suspense>
+            <div className="f">Prévia do e-mail diário, com editais reais abertos agora</div>
+          </div>
         </div>
-        <Suspense fallback={<div className="card" style={{ height: 420 }} />}>
-          <AoVivo />
-        </Suspense>
       </section>
 
-      <section id="setores" className="section container">
-        <div className="section-head">
-          <h2>Não sabe que palavra buscar?</h2>
-          <p>Escolha seu ramo. A busca já vem com as palavras-chave que os órgãos usam, e você ajusta depois.</p>
-        </div>
-        <div className="row" style={{ gap: 8 }}>
-          {SETORES.map((s) => (
-            <Link key={s.id} className="chip-btn" href={`/buscar?q=${encodeURIComponent(s.palavras)}`}>
-              {s.nome}
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="container confianca" aria-label="Confiança">
-        {CONFIANCA.map((c) => (
-          <div key={c.titulo}>
-            <span className="ico">
-              <Icon name={c.icon} size={17} />
-            </span>
-            <span>
-              <h3>{c.titulo}</h3>
-              <p>{c.texto}</p>
-            </span>
-          </div>
-        ))}
-      </section>
-
-      <section className="cta-band">
-        <div className="container spread">
-          <div>
-            <h2>Amanhã às 7h, os editais do seu ramo no seu e-mail.</h2>
-            <p>Entre só com seu e-mail, sem senha, diga o que você vende e pronto.</p>
-          </div>
-          <Link className="btn btn-lg btn-primary" href="/entrar">
-            Montar meu primeiro alerta
-          </Link>
-        </div>
+      <section className="container cta-final">
+        <h2>Amanhã às 7h, os editais do seu ramo no seu e-mail.</h2>
+        <p>Entre só com seu e-mail, diga o que você vende e pronto.</p>
+        <Link className="btn btn-primary" href="/entrar">
+          Começar agora
+        </Link>
       </section>
     </main>
   );

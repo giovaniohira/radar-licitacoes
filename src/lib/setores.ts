@@ -10,6 +10,14 @@ export const SETORES: { id: string; nome: string; cnae: string; palavras: string
   { id: "eventos", nome: "Eventos e gráfica", cnae: "18.13, 82.30", palavras: "serviços gráficos, impressão, banners, sonorização, organização de eventos, tendas" },
 ];
 
+// Contract-size presets for alerts. R$ 80 mil is the Lei Complementar 123 ceiling for items reserved to ME/EPP.
+export const FAIXAS = [
+  { nome: "Qualquer valor", desc: "da compra direta ao milionário", min: "", max: "" },
+  { nome: "Até R$ 80 mil", desc: "disputa exclusiva ME/EPP", min: "", max: "80000" },
+  { nome: "Até R$ 1 milhão", desc: "pequenas e médias", min: "", max: "1000000" },
+  { nome: "Acima de R$ 1 mi", desc: "grandes contratos", min: "1000000", max: "" },
+];
+
 export const UFS = [
   "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS", "MT", "PA", "PB",
   "PE", "PI", "PR", "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO",

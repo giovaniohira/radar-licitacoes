@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { confirmarLogin } from "../../../actions/auth";
+import { AuthLayout } from "@/components/AuthLayout";
+import { confirmarLogin } from "../../actions/auth";
 
 export const metadata: Metadata = { title: "Confirmar acesso", robots: { index: false } };
 
@@ -12,17 +13,19 @@ async function TokenField({ searchParams }: PageProps<"/entrar/confirmar">) {
 
 export default function Confirmar(props: PageProps<"/entrar/confirmar">) {
   return (
-    <main id="conteudo" className="auth">
-      <form className="card" action={confirmarLogin}>
-        <h1 style={{ fontSize: 20 }}>Quase lá</h1>
-        <p className="muted small">Confirme para entrar no Radar neste navegador.</p>
+    <AuthLayout>
+      <div>
+        <h1>Quase lá</h1>
+        <p>Confirme para entrar no Radar neste navegador.</p>
+      </div>
+      <form action={confirmarLogin} className="stack">
         <Suspense>
           <TokenField {...props} />
         </Suspense>
-        <button type="submit" className="btn btn-primary btn-lg">
+        <button type="submit" className="btn btn-primary">
           Entrar
         </button>
       </form>
-    </main>
+    </AuthLayout>
   );
 }

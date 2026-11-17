@@ -3,12 +3,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { Bars, HBars } from "@/components/charts";
-import { ContratosTabela } from "@/components/ContratosTabela";
-import { Loading, PageHead, Stat } from "@/components/ui";
+import { HBars, ListaRanking, iniciais } from "@/components/charts";
+import { Kpi, Loading } from "@/components/ui";
 import { pool } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, nome } from "@/lib/format";
-import { analisar, contratosRecentes, fornecedorInfo } from "@/lib/mercado";
+import { analisar, fornecedorInfo } from "@/lib/mercado";
 
 const getFornecedor = cache((ni: string) => fornecedorInfo(pool(), ni));
 
@@ -28,58 +27,40 @@ async function Fornecedor({ params }: PageProps<"/fornecedor/[ni]">) {
   if (ni.length !== 14) notFound();
   const info = await getFornecedor(ni);
   if (!info) notFound();
-  const f = { fornecedor: ni, dias: 365 };
-  const [m, recentes] = await Promise.all([analisar(pool(), f), contratosRecentes(pool(), f, 20)]);
+  const m = await analisar(pool(), { fornecedor: ni, dias: 365 });
 
   return (
-    <div className="page">
-      <PageHead
-        crumbs={
-          <>
-            <Link href="/mercado">Mercado</Link>/<span>Fornecedor</span>
-          </>
-        }
-        title={nome(info.nome)}
-        sub={`CNPJ ${formatCNPJ(ni)}`}
-      />
-      <div className="grid g4" style={{ marginBottom: 24 }}>
-        <Stat label="Contratos (12 meses)" value={formatInt(m.totais.contratos)} />
-        <Stat label="Valor contratado" value={formatBRLCompact(m.totais.valor)} />
-        <Stat label="Contrato mediano" value={formatBRL(m.totais.mediana)} />
-        <Stat label="Órgãos clientes" value={formatInt(m.totais.orgaos)} hint={`em ${formatInt(m.ufs.length)} estados`} />
-      </div>
-      <div className="stack-lg">
-        <div className="grid g2">
-          <section className="card">
-            <div className="card-head">
-              <h2>Principais clientes</h2>
-            </div>
-            <div className="card-body">
-              <HBars rows={m.orgaos.map((o) => ({ ...o, nome: nome(o.nome) }))} href={(id) => `/orgao/${id}`} />
-            </div>
-          </section>
-          <section className="card">
-            <div className="card-head">
-              <h2>O que vende</h2>
-            </div>
-            <div className="card-body">
-              <HBars rows={m.categorias} />
-            </div>
-          </section>
+    <div className="page" style={{ gap: 20 }}>
+      <nav className="crumbs" aria-label="Você está em">
+        <Link href="/mercado">Mercado</Link>
+        <span>/</span>
+        <span>Fornecedor</span>
+      </nav>
+      <header className="org-head">
+        <span className="tile" aria-hidden>
+          {iniciais(info.nome)}
+        </span>
+        <div>
+          <h1>{nome(info.nome)}</h1>
+          <p>CNPJ {formatCNPJ(ni)}</p>
         </div>
-        <section className="card">
-          <div className="card-head">
-            <h2>Contratado por semana</h2>
-          </div>
-          <div className="card-body">
-            <Bars points={m.serie} />
-          </div>
+      </header>
+
+      <section aria-label="Totais" className="kpis">
+        <Kpi label="Contratos (12 meses)" value={formatInt(m.totais.contratos)} />
+        <Kpi label="Valor contratado" value={formatBRLCompact(m.totais.valor)} hint="nos últimos 12 meses" />
+        <Kpi label="Contrato mediano" value={formatBRL(m.totais.mediana)} hint="metade fica abaixo" />
+        <Kpi label="Órgãos clientes" value={formatInt(m.totais.orgaos)} hint={`em ${formatInt(m.ufs.length)} estados`} />
+      </section>
+
+      <div className="duo">
+        <section className="card card-pad stack" style={{ gap: 10 }}>
+          <h2 style={{ marginBottom: 4 }}>Principais clientes</h2>
+          <ListaRanking rows={m.orgaos} href={(id) => `/orgao/${id}`} />
         </section>
-        <section className="card">
-          <div className="card-head">
-            <h2>Contratos</h2>
-          </div>
-          <ContratosTabela rows={recentes} ocultar="fornecedor" />
+        <section className="card card-pad stack" style={{ gap: 10 }}>
+          <h2 style={{ marginBottom: 4 }}>O que vende</h2>
+          <HBars rows={m.categorias} />
         </section>
       </div>
     </div>

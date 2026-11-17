@@ -3,12 +3,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { Bars, HBars } from "@/components/charts";
-import { ContratosTabela } from "@/components/ContratosTabela";
-import { EditalItem, Empty, Loading, PageHead, Stat, type EditalLinha } from "@/components/ui";
+import { HBars, ListaRanking, iniciais } from "@/components/charts";
+import { EditalRow, EditalRows, Empty, Interesse, Kpi, Loading, type EditalLinha } from "@/components/ui";
 import { pool, query } from "@/lib/db";
-import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, local, nome } from "@/lib/format";
-import { analisar, contratosRecentes, orgaoInfo } from "@/lib/mercado";
+import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, local, nome, prazo } from "@/lib/format";
+import { analisar, orgaoInfo } from "@/lib/mercado";
+import { currentUser } from "@/lib/session";
 
 const getOrgao = cache((cnpj: string) => orgaoInfo(pool(), cnpj));
 
@@ -28,78 +28,76 @@ async function Orgao({ params }: PageProps<"/orgao/[cnpj]">) {
   const cnpj = (await params).cnpj.replace(/\D/g, "");
   const info = await getOrgao(cnpj);
   if (!info) notFound();
-  const f = { orgao: cnpj, dias: 365 };
-  const [m, recentes, abertos] = await Promise.all([
-    analisar(pool(), f),
-    contratosRecentes(pool(), f, 15),
+  const [m, abertos, user] = await Promise.all([
+    analisar(pool(), { orgao: cnpj, dias: 365 }),
     query<EditalLinha>(
       `select id, objeto, orgao, uf, municipio, modalidade, valor_estimado::float8 as valor_estimado, encerramento
        from editais where cnpj = $1 and encerramento > now() order by encerramento limit 20`,
       [cnpj],
     ),
+    currentUser(),
   ]);
+  const etapas =
+    user && abertos.length
+      ? new Map(
+          (await query<{ edital_id: string; etapa: string }>(`select edital_id, etapa from pipeline where user_id = $1 and edital_id = any($2::text[])`, [user.id, abertos.map((a) => a.id)])).map(
+            (r) => [r.edital_id, r.etapa],
+          ),
+        )
+      : new Map<string, string>();
 
   return (
-    <div className="page">
-      <PageHead
-        crumbs={
-          <>
-            <Link href="/mercado">Mercado</Link>/<span>Órgão</span>
-          </>
-        }
-        title={nome(info.nome)}
-        sub={[formatCNPJ(cnpj), local(info.municipio, info.uf), info.esfera ? ESFERA[info.esfera] : null].filter(Boolean).join(" · ")}
-      />
-      <div className="grid g4" style={{ marginBottom: 24 }}>
-        <Stat label="Editais abertos" value={formatInt(abertos.length)} />
-        <Stat label="Contratos (12 meses)" value={formatInt(m.totais.contratos)} />
-        <Stat label="Valor contratado" value={formatBRLCompact(m.totais.valor)} />
-        <Stat label="Contrato mediano" value={formatBRL(m.totais.mediana)} hint={`${formatInt(m.totais.fornecedores)} fornecedores`} />
-      </div>
-      <div className="stack-lg">
-        <section className="card">
-          <div className="card-head">
-            <h2>Editais abertos agora</h2>
-          </div>
-          {abertos.length ? abertos.map((e) => <EditalItem key={e.id} e={e} />) : <Empty title="Nenhum edital aberto agora" />}
-        </section>
-        {m.totais.contratos > 0 && (
-          <>
-            <div className="grid g2">
-              <section className="card">
-                <div className="card-head">
-                  <h2>Fornecedores que mais vendem para este órgão</h2>
-                </div>
-                <div className="card-body">
-                  <HBars rows={m.fornecedores.map((o) => ({ ...o, nome: nome(o.nome) }))} href={(id) => `/fornecedor/${id}`} />
-                </div>
-              </section>
-              <section className="card">
-                <div className="card-head">
-                  <h2>O que compra</h2>
-                </div>
-                <div className="card-body">
-                  <HBars rows={m.categorias} />
-                </div>
-              </section>
-            </div>
-            <section className="card">
-              <div className="card-head">
-                <h2>Contratado por semana</h2>
-              </div>
-              <div className="card-body">
-                <Bars points={m.serie} />
-              </div>
-            </section>
-            <section className="card">
-              <div className="card-head">
-                <h2>Contratos recentes</h2>
-              </div>
-              <ContratosTabela rows={recentes} ocultar="orgao" />
-            </section>
-          </>
+    <div className="page" style={{ gap: 20 }}>
+      <nav className="crumbs" aria-label="Você está em">
+        <Link href="/mercado">Mercado</Link>
+        <span>/</span>
+        <span>Órgão</span>
+      </nav>
+      <header className="org-head">
+        <span className="tile" aria-hidden>
+          {iniciais(info.nome)}
+        </span>
+        <div>
+          <h1>{nome(info.nome)}</h1>
+          <p>{[info.esfera ? ESFERA[info.esfera] : null, local(info.municipio, info.uf), `CNPJ ${formatCNPJ(cnpj)}`].filter(Boolean).join(" · ")}</p>
+        </div>
+      </header>
+
+      <section aria-label="Totais" className="kpis">
+        <Kpi label="Editais abertos" value={formatInt(abertos.length)} hint={abertos[0] ? `o próximo fecha ${prazo(abertos[0].encerramento)}` : "nenhum aberto agora"} />
+        <Kpi label="Contratos (12 meses)" value={formatInt(m.totais.contratos)} hint={`${formatInt(m.totais.fornecedores)} fornecedores`} />
+        <Kpi label="Valor contratado" value={formatBRLCompact(m.totais.valor)} hint="nos últimos 12 meses" />
+        <Kpi label="Contrato mediano" value={formatBRL(m.totais.mediana)} hint="metade fica abaixo" />
+      </section>
+
+      <section className="card" style={{ overflow: "hidden" }}>
+        <div className="card-head">
+          <h2>Editais abertos agora</h2>
+          <span className="xs subtle">{abertos.length === 1 ? "1 aberto" : `${formatInt(abertos.length)} abertos`}</span>
+        </div>
+        {abertos.length ? (
+          <EditalRows>
+            {abertos.map((e) => (
+              <EditalRow key={e.id} e={e} apagado={etapas.get(e.id) === "descartada"} acoes={<Interesse id={e.id} etapa={etapas.get(e.id)} />} />
+            ))}
+          </EditalRows>
+        ) : (
+          <Empty title="Nenhum edital aberto agora" />
         )}
-      </div>
+      </section>
+
+      {m.totais.contratos > 0 && (
+        <div className="duo">
+          <section className="card card-pad stack" style={{ gap: 10 }}>
+            <h2 style={{ marginBottom: 4 }}>O que compra</h2>
+            <HBars rows={m.categorias} />
+          </section>
+          <section className="card card-pad stack" style={{ gap: 10 }}>
+            <h2 style={{ marginBottom: 4 }}>Fornecedores que mais vendem para este órgão</h2>
+            <ListaRanking rows={m.fornecedores} href={(id) => `/fornecedor/${id}`} />
+          </section>
+        </div>
+      )}
     </div>
   );
 }
