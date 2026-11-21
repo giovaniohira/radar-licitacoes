@@ -2,7 +2,7 @@
 
 **Encontre, acompanhe e ganhe licitações públicas.** O Vencedital lê todo dia o Portal Nacional de Contratações Públicas (PNCP), avisa por e-mail quando sai um edital que combina com a sua empresa, resume o PDF do edital com IA, organiza as propostas num pipeline e mostra quem compra e quem vence no seu mercado.
 
-**No ar:** https://apps.giovaniohira.com/radar (muda para https://vencedital.com.br no lançamento). O repositório e os containers mantêm o nome interno `radar`.
+**No ar:** https://vencedital.com.br. O repositório e os containers mantêm o nome interno `radar`.
 
 <img alt="Hoje: a próxima tarefa, editais novos dos alertas e os prazos da semana" src="docs/painel.png">
 
@@ -84,7 +84,7 @@ TEST_DATABASE_URL=postgres://radar:radar@localhost:5544/radar_test npm test
 
 ## Deploy
 
-Todo push na `main` que passa no CI builda as imagens `web` e `jobs`, publica no GHCR e faz `docker compose up -d` na VPS em `/opt/radar` com um usuário dedicado, seguido de smoke test. O nginx do host serve `/radar` com o snippet em [`deploy/nginx-location.conf`](deploy/nginx-location.conf). Segredos ficam só no `.env` da VPS.
+Todo push na `main` que passa no CI builda as imagens `web` e `jobs`, publica no GHCR e faz `docker compose up -d` na VPS em `/opt/radar` com um usuário dedicado, seguido de smoke test. O nginx do host serve `vencedital.com.br` com o server block em [`deploy/nginx-site.conf`](deploy/nginx-site.conf) (certificado Let's Encrypt por webroot, log de acesso guardado 6 meses com [`deploy/logrotate-vencedital`](deploy/logrotate-vencedital)), e o endereço antigo `apps.giovaniohira.com/radar` responde 301 para o novo, preservando a query string, com [`deploy/nginx-location.conf`](deploy/nginx-location.conf). Segredos ficam só no `.env` da VPS.
 
 Fluxo do dia a dia:
 

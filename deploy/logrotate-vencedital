@@ -1,0 +1,14 @@
+# /etc/logrotate.d/vencedital: access records for 6 months (Privacy Policy; Marco Civil da Internet, art. 15).
+/var/log/nginx-vencedital/*.log {
+	daily
+	rotate 190
+	missingok
+	notifempty
+	compress
+	delaycompress
+	create 0640 www-data adm
+	sharedscripts
+	postrotate
+		invoke-rc.d nginx rotate >/dev/null 2>&1
+	endscript
+}
