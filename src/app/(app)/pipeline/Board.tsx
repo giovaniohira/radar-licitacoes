@@ -142,7 +142,7 @@ export function Board({ inicial }: { inicial: PipelineItem[] }) {
                     <Pill i={i} />
                   </span>
                   <span className="passo">
-                    <Icon name="arrowRight" size={14} strokeWidth={2.2} />
+                    <Icon name="arrowRight" size={14} />
                     {passo(i)}
                   </span>
                 </Link>

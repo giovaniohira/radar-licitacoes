@@ -95,9 +95,8 @@ export default function Home() {
     <main id="conteudo">
       <section className="container hero">
         <div className="hero-copy">
-          <span className="eyebrow-pill">Para empresas que vendem ao governo, em todo o Brasil</span>
           <h1>Nunca mais perca um edital que sua empresa podia ganhar.</h1>
-          <p className="lead">Todo dia às 7h, os editais novos do seu ramo no seu e-mail. A IA lê o PDF por você, e o Radar lembra dos prazos.</p>
+          <p className="lead">Para quem vende ao governo: todo dia às 7h, os editais novos do seu ramo no seu e-mail. A IA lê o PDF por você, e o Radar lembra dos prazos.</p>
           <LoginForm variante="hero" />
           <p className="small subtle">Sem senha e sem cartão. Você entra pelo link que chega no e-mail.</p>
         </div>
@@ -145,9 +144,8 @@ export default function Home() {
       <section className="container landing-sec">
         <h2 className="big-h">Do edital publicado à proposta enviada, sem planilha.</h2>
         <div className="recursos">
-          {RECURSOS.map((r, i) => (
+          {RECURSOS.map((r) => (
             <article key={r.t}>
-              <span className="n">{i + 1}</span>
               <h3>{r.t}</h3>
               <p>{r.d}</p>
             </article>
@@ -158,7 +156,7 @@ export default function Home() {
       <section id="como" className="band como">
         <div className="container">
           <div className="como-passos">
-            <h2>Como funciona</h2>
+            <h2>Do cadastro ao primeiro e-mail em três passos</h2>
             {PASSOS.map((p, i) => (
               <div key={p.t} className="p">
                 <span className="n">{i + 1}</span>

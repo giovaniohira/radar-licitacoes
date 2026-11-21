@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
-import { EditalRow, EditalRows, Empty, Interesse, Kpi, Loading, editalHref } from "@/components/ui";
+import { EditalRow, EditalRows, Empty, Interesse, Loading, editalHref } from "@/components/ui";
 import { pool, query } from "@/lib/db";
-import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazoTom, tituloCurto } from "@/lib/format";
 import { first } from "@/lib/params";
 import { ETAPAS, etapaLabel, listPipeline, vencendo, type Etapa, type PipelineItem } from "@/lib/pipeline";
 import { buildSearch, type EditalResumo } from "@/lib/search";
@@ -145,6 +145,8 @@ function EmDisputa({ itens }: { itens: PipelineItem[] }) {
     return { ...e, n: lista.length, valor: lista.reduce((s, i) => s + (i.valor_proposta ?? i.valor_estimado ?? 0), 0) };
   });
   const total = etapas.reduce((s, e) => s + e.valor, 0);
+  const ganhas = itens.filter((i) => i.etapa === "ganha").length;
+  const perdidas = itens.filter((i) => i.etapa === "perdida").length;
   const ativos = etapas.reduce((s, e) => s + e.n, 0);
   return (
     <section className="card card-pad stack">
@@ -168,6 +170,11 @@ function EmDisputa({ itens }: { itens: PipelineItem[] }) {
           </div>
         ))}
       </div>
+      {(ganhas > 0 || perdidas > 0) && (
+        <p className="small muted num" style={{ paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+          Resultado até agora: {plural(ganhas, "ganho", "ganhos")}, {plural(perdidas, "perdido", "perdidos")}
+        </p>
+      )}
     </section>
   );
 }
@@ -213,11 +220,6 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
     .sort((a, b) => new Date(b.publicado_em ?? 0).getTime() - new Date(a.publicado_em ?? 0).getTime())
     .slice(0, 10);
   const etapaDe = new Map(itens.map((i) => [i.edital_id, i.etapa]));
-  const semana = vencendo(itens, 7);
-  const ganhas = itens.filter((i) => i.etapa === "ganha").length;
-  const perdidas = itens.filter((i) => i.etapa === "perdida").length;
-  const emDisputa = itens.filter((i) => EM_DISPUTA.includes(i.etapa));
-  const valorDisputa = emDisputa.reduce((s, i) => s + (i.valor_proposta ?? i.valor_estimado ?? 0), 0);
   const proximoEmail = Number(horaBR.format(new Date())) < 7 ? "hoje, 7h" : "amanhã, 7h";
 
   const passos = [
@@ -242,7 +244,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
           </h1>
         </div>
         <Link className="btn" href="/alertas">
-          <Icon name="plus" size={15} strokeWidth={2.2} /> Novo alerta
+          <Icon name="plus" size={15} /> Novo alerta
         </Link>
       </header>
       {first(sp.bemvindo) && (
@@ -268,13 +270,6 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
           ))}
         </section>
       )}
-
-      <section aria-label="Resumo" className="kpis">
-        <Kpi label="Novos nas últimas 24h" value={formatInt(totalNovos)} hint={alerts.length ? `de ${plural(alerts.length, "alerta ativo", "alertas ativos")}` : "nenhum alerta ativo"} />
-        <Kpi label="Em disputa" value={valorDisputa ? formatBRLCompact(valorDisputa) : "R$ 0"} hint={plural(emDisputa.length, "edital", "editais")} />
-        <Kpi label="Prazos nesta semana" value={formatInt(semana.length)} hint={semana[0] ? `o próximo ${prazo(semana[0].encerramento)}` : "nenhum prazo"} />
-        <Kpi label="Resultado" value={plural(ganhas, "ganho", "ganhos")} hint={`${plural(perdidas, "perdido", "perdidos")} até agora`} />
-      </section>
 
       <div className="cols">
         <section id="novos" className="card col-main" style={{ overflow: "hidden", gap: 0 }}>

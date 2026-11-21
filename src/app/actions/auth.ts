@@ -53,7 +53,7 @@ async function enviarLink(userId: number, para: string, emailNovo: string | null
 O link vale ${LOGIN_TOKEN_MINUTES} minutos. Se não foi você, ignore este e-mail.`,
     html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:auto;color:#18181b">
 <p style="font-size:16px;font-weight:600">${titulo}</p>
-<p><a href="${escapeHtml(url)}" style="display:inline-block;background:#0f766e;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">${botao}</a></p>
+<p><a href="${escapeHtml(url)}" style="display:inline-block;background:#1e293b;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">${botao}</a></p>
 <p style="color:#5f5f6b;font-size:13px">O link vale ${LOGIN_TOKEN_MINUTES} minutos e só funciona uma vez. Se não foi você, ignore este e-mail.</p></div>`,
   });
 }

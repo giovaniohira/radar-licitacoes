@@ -119,7 +119,7 @@ export function Interesse({ id, etapa }: { id: string; etapa?: string }) {
   if (etapa) {
     return (
       <Link className="etapa-tag" href="/pipeline">
-        <Icon name="check" size={13} strokeWidth={2.4} />
+        <Icon name="check" size={13} />
         {etapaLabel(etapa)}
       </Link>
     );

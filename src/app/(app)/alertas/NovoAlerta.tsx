@@ -118,7 +118,7 @@ export function NovoAlerta({ editar }: { editar?: AlertaEditavel }) {
 
       {total != null && (
         <div className="contagem" role="status">
-          <Icon name="check" size={16} strokeWidth={2.2} />
+          <Icon name="check" size={16} />
           <span>
             <strong className="num">
               {formatInt(total)} {total === 1 ? "edital aberto" : "editais abertos"}

@@ -10,7 +10,7 @@ export function LoginForm({ variante }: { variante?: "hero" }) {
   if (state?.ok) {
     return (
       <div role="status" className="sent" style={variante ? { maxWidth: 520 } : undefined}>
-        <Icon name="check" size={18} strokeWidth={2.2} />
+        <Icon name="check" size={18} />
         <span>
           <strong>Link enviado.</strong> {state.ok} Abra o e-mail neste aparelho e clique em “Entrar”.
         </span>
