@@ -1,10 +1,20 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { pedirLink } from "../actions/auth";
 
-/** E-mail-only sign-in. `hero` is the inline version on the landing page. */
+/** Terms acceptance next to every sign-in button (docs/empresa/avisos-produto.md §3). */
+function Aceite() {
+  return (
+    <p className="xs subtle" style={{ flexBasis: "100%", margin: 0 }}>
+      Ao entrar, você aceita os <Link href="/termos">Termos de Uso</Link> e a <Link href="/privacidade">Política de Privacidade</Link>.
+    </p>
+  );
+}
+
+/** E-mail-only sign-in (it also creates the account). `hero` is the inline version on the landing page. */
 export function LoginForm({ variante }: { variante?: "hero" }) {
   const [state, action, pending] = useActionState(pedirLink, null);
   if (state?.ok) {
@@ -25,9 +35,10 @@ export function LoginForm({ variante }: { variante?: "hero" }) {
         </label>
         <input id="hero-email" className="input" name="email" type="email" required autoComplete="email" placeholder="voce@empresa.com.br" />
         <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? "Enviando…" : "Receber link de acesso"}
+          {pending ? "Enviando…" : "Começar teste grátis"}
         </button>
         {state?.error && <div className="notice" style={{ flexBasis: "100%" }}>{state.error}</div>}
+        <Aceite />
       </form>
     );
   }
@@ -41,6 +52,7 @@ export function LoginForm({ variante }: { variante?: "hero" }) {
         {pending ? "Enviando…" : "Receber link de acesso"}
       </button>
       {state?.error && <div className="notice">{state.error}</div>}
+      <Aceite />
     </form>
   );
 }

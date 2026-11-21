@@ -16,7 +16,7 @@ export default function Confirmar(props: PageProps<"/entrar/confirmar">) {
     <AuthLayout>
       <div>
         <h1>Quase lá</h1>
-        <p>Confirme para entrar no Radar neste navegador.</p>
+        <p>Confirme para entrar no Vencedital neste navegador.</p>
       </div>
       <form action={confirmarLogin} className="stack">
         <Suspense>

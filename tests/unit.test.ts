@@ -1,6 +1,9 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { hashToken, icsToken, newLoginToken, normalizeEmail, signSession, verifyIcsToken, verifySession } from "@/lib/auth";
-import { renderDigest, type Alert } from "@/lib/alerts";
+import { AVISO_DIGEST, renderDigest, type Alert } from "@/lib/alerts";
+import { quemSomos } from "@/lib/empresa";
 import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
 import { parseFiltros, parseValor, withParams } from "@/lib/params";
@@ -137,6 +140,15 @@ describe("renderDigest", () => {
     expect(d.html).toContain("Notebooks &amp; &quot;monitores&quot;");
     expect(d.html).toContain("https://radar.test/edital/1-1-000001%2F2026");
     expect(d.text).toContain("em 4 dias");
+  });
+
+  it("carries the legal notice in both versions", () => {
+    const d = renderDigest("https://radar.test", [{ alert, editais: [e] }], new Date("2026-10-16T12:00:00Z"));
+    expect(AVISO_DIGEST).toContain("sem vínculo com o governo");
+    expect(AVISO_DIGEST).not.toMatch(/null|undefined/);
+    expect(d.text).toContain(AVISO_DIGEST);
+    expect(d.html).toContain(AVISO_DIGEST);
+    expect(d.html).toContain(">Vencedital</span>");
   });
 });
 
@@ -280,5 +292,22 @@ describe("robots", () => {
     const r = robotsFor("https://apps.giovaniohira.com/radar/");
     expect(r.sitemap).toBe("https://apps.giovaniohira.com/radar/sitemap.xml");
     expect(r.rules).toMatchObject({ allow: "/radar/", disallow: expect.arrayContaining(["/radar/painel", "/radar/entrar/confirmar"]) });
+  });
+});
+
+describe("legal copy", () => {
+  it("names the company without empty fields", () => {
+    expect(quemSomos()).toMatch(/^OHIRA TECNOLOGIA LTDA/);
+    expect(quemSomos()).not.toMatch(/null|undefined|, ,|,$/);
+  });
+
+  it("never ships a placeholder from the drafts in docs/empresa", () => {
+    const arquivos = (dir: string): string[] =>
+      readdirSync(dir).flatMap((f) => {
+        const p = path.join(dir, f);
+        return statSync(p).isDirectory() ? arquivos(p) : /\.(tsx?|css)$/.test(f) ? [p] : [];
+      });
+    const achados = arquivos("src").filter((f) => /\{(CNPJ|ENDERECO|CIDADE_FORO|DATA_PUBLICACAO|PRECO|CONTATO|PROVEDOR_\w+|PAIS_\w+|PRAZO_BACKUP|NOME|DOMINIO)\}/.test(readFileSync(f, "utf8")));
+    expect(achados).toEqual([]);
   });
 });

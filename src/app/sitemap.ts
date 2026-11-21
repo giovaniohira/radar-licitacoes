@@ -3,8 +3,7 @@ import { connection } from "next/server";
 import { editalHref } from "@/components/ui";
 import { query } from "@/lib/db";
 
-// Public pages plus every open edital. Served at <APP_URL>/sitemap.xml; submit that URL in Search Console,
-// since crawlers only read robots.txt at the domain root, which this app doesn't own.
+// Public pages plus every open edital. Served at <APP_URL>/sitemap.xml and listed in robots.txt.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   await connection();
   const base = process.env.APP_URL ?? "http://localhost:3000";
@@ -17,6 +16,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/buscar`, changeFrequency: "daily" },
     { url: `${base}/mercado`, changeFrequency: "weekly" },
     { url: `${base}/privacidade`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${base}/termos`, changeFrequency: "yearly", priority: 0.2 },
     ...editais.map((e) => ({ url: base + editalHref(e.id), lastModified: e.publicado_em })),
   ];
 }

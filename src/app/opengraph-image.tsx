@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
+import { MARK } from "@/components/icons";
 
-export const alt = "Radar de Licitações: os editais do PNCP que combinam com sua empresa, no seu e-mail às 7h";
+export const alt = "Vencedital: os editais do seu ramo chegam às 7h, já lidos pela IA";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -12,16 +13,15 @@ export default function Image() {
         <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 44, fontWeight: 700, letterSpacing: -1 }}>
           <div style={{ width: 72, height: 72, borderRadius: 16, background: "#0F172A", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="48" height="48" viewBox="0 0 32 32">
-              <rect x="6" y="5" width="6.5" height="22" rx="1" fill="#FFFFFF" />
-              <path d="M12.5 5H16a6.5 6.5 0 0 1 0 13h-3.5z" fill="#F97316" />
-              <path d="M13.5 18 26 27H17.5z" fill="#FFFFFF" />
+              <path d={MARK.esquerda} fill="#FFFFFF" />
+              <path d={MARK.direita} fill="#F97316" />
             </svg>
           </div>
-          radar licitações
+          vencedital
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.05, letterSpacing: -2 }}>Nunca mais perca um edital que sua empresa podia ganhar.</div>
-          <div style={{ fontSize: 32, color: "#FDBA74" }}>Alertas diários do PNCP, resumo do edital por IA e controle das suas disputas.</div>
+          <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.05, letterSpacing: -2 }}>Os editais do seu ramo chegam às 7h. Já lidos.</div>
+          <div style={{ fontSize: 32, color: "#FDBA74" }}>Alerta diário do PNCP, resumo do edital por IA e controle das suas disputas.</div>
         </div>
       </div>
     ),

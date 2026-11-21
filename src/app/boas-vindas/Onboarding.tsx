@@ -69,7 +69,7 @@ export function Onboarding({ email }: { email: string }) {
             <div>
               <p className="k">Passo 1 de 4</p>
               <h1>O que sua empresa vende para o governo?</h1>
-              <p>Escolha um ou mais setores. Eles viram as palavras-chave que o Radar procura todo dia no PNCP.</p>
+              <p>Escolha um ou mais setores. Eles viram as palavras-chave que o Vencedital procura todo dia no PNCP.</p>
             </div>
             <div className="onb-cards">
               {SETORES.map((s) => (

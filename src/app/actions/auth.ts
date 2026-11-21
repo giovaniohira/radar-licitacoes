@@ -43,11 +43,11 @@ async function enviarLink(userId: number, para: string, emailNovo: string | null
     [hash, userId, LOGIN_TOKEN_MINUTES, emailNovo],
   );
   const url = `${process.env.APP_URL ?? "http://localhost:3000"}/entrar/confirmar?token=${token}`;
-  const titulo = emailNovo ? "Confirmar novo e-mail no Radar de Licitações" : "Entrar no Radar de Licitações";
+  const titulo = emailNovo ? "Confirmar novo e-mail no Vencedital" : "Entrar no Vencedital";
   const botao = emailNovo ? "Confirmar e-mail" : "Entrar";
   await sendMail({
     to: para,
-    subject: emailNovo ? "Confirme seu novo e-mail no Radar de Licitações" : "Seu link de acesso ao Radar de Licitações",
+    subject: emailNovo ? "Confirme seu novo e-mail no Vencedital" : "Seu link de acesso ao Vencedital",
     text: `${titulo}: ${url}
 
 O link vale ${LOGIN_TOKEN_MINUTES} minutos. Se não foi você, ignore este e-mail.`,
@@ -102,7 +102,7 @@ export async function trocarEmail(_: FormState, form: FormData): Promise<FormSta
   const email = normalizeEmail(String(form.get("email") ?? ""));
   if (!email) return { error: "E-mail inválido." };
   if (email === user.email) return { error: "Esse já é o seu e-mail." };
-  if ((await query(`select 1 from users where email = $1`, [email])).length) return { error: "Esse e-mail já tem uma conta no Radar." };
+  if ((await query(`select 1 from users where email = $1`, [email])).length) return { error: "Esse e-mail já tem uma conta no Vencedital." };
   if ((await linksRecentes(user.id)) >= 3) return { error: "Já enviamos links há pouco. Tente de novo em alguns minutos." };
   await enviarLink(user.id, email, email);
   return { ok: `Enviamos um link para ${email}. A troca só vale depois que você abrir o link.` };
