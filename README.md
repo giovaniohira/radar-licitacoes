@@ -1,13 +1,10 @@
-# Radar de Licitações
+# Vencedital
 
-**Encontre, acompanhe e ganhe licitações públicas.** O Radar lê todo dia o Portal Nacional de Contratações Públicas (PNCP), avisa por e-mail quando sai um edital que combina com a sua empresa, resume o PDF do edital com IA, organiza as propostas num pipeline e mostra quem compra e quem vence no seu mercado.
+**Encontre, acompanhe e ganhe licitações públicas.** O Vencedital lê todo dia o Portal Nacional de Contratações Públicas (PNCP), avisa por e-mail quando sai um edital que combina com a sua empresa, resume o PDF do edital com IA, organiza as propostas num pipeline e mostra quem compra e quem vence no seu mercado.
 
-**No ar:** https://apps.giovaniohira.com/radar
+**No ar:** https://apps.giovaniohira.com/radar (muda para https://vencedital.com.br no lançamento). O repositório e os containers mantêm o nome interno `radar`.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/painel-dark.png">
-  <img alt="Hoje: editais novos dos alertas com triagem na linha e os prazos da semana" src="docs/painel.png">
-</picture>
+<img alt="Hoje: a próxima tarefa, editais novos dos alertas e os prazos da semana" src="docs/painel.png">
 
 ## O que faz
 
@@ -27,6 +24,10 @@
 <tr>
 <td><img alt="Busca" src="docs/busca.png"></td>
 <td><img alt="Edital" src="docs/edital.png"></td>
+</tr>
+<tr>
+<td><img alt="Landing" src="docs/home.png"></td>
+<td><img alt="Termos de Uso" src="docs/termos.png"></td>
 </tr>
 </table>
 
@@ -79,7 +80,7 @@ Sem `SMTP_URL`, os e-mails saem no terminal. Sem `ANTHROPIC_API_KEY`, o resumo p
 TEST_DATABASE_URL=postgres://radar:radar@localhost:5544/radar_test npm test
 ```
 
-51 testes: unitários (normalização com dados reais do PNCP, retry, SQL parametrizado, sessão HMAC, casing, dobra de linhas do iCalendar, anonimização de pessoa física) e de integração com Postgres real (upsert idempotente, busca sem acento, ingestão paginada, ordem do pipeline, agregações de mercado e envio único por alerta). O CI roda tipos, lint, testes e build a cada push.
+59 testes: unitários (normalização com dados reais do PNCP, retry, SQL parametrizado, sessão HMAC, casing, dobra de linhas do iCalendar, anonimização de pessoa física) e de integração com Postgres real (upsert idempotente, busca sem acento, ingestão paginada, ordem do pipeline, agregações de mercado e envio único por alerta). O CI roda tipos, lint, testes e build a cada push.
 
 ## Deploy
 

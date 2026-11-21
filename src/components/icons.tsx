@@ -40,27 +40,30 @@ export function Icon({ name, size = 16, className, strokeWidth = 2 }: { name: Ic
   );
 }
 
-/** The "R construído" mark: stem, orange bowl, leg. Colors are fixed, it always sits on navy. */
+/** The V mark on a 32px grid: white left arm, orange right arm (it reads as a check). Shared with icon.svg and the OG image. */
+export const MARK = {
+  esquerda: "M5 7h6l8 19h-6z",
+  direita: "M21 7h6l-8 19-3-7.125z",
+};
+
+/** Colors are fixed: the mark always sits on navy. */
 export function Mark({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-      <rect x="6" y="5" width="6.5" height="22" rx="1" fill="#FFFFFF" />
-      <path d="M12.5 5H16a6.5 6.5 0 0 1 0 13h-3.5z" fill="#F97316" />
-      <path d="M13.5 18 26 27H17.5z" fill="#FFFFFF" />
+      <path d={MARK.esquerda} fill="#FFFFFF" />
+      <path d={MARK.direita} fill="#F97316" />
     </svg>
   );
 }
 
-/** Mark + "radar" wordmark; `completo` adds "licitações" (public site and sign-in). */
-export function Logo({ href = "/", completo = false }: { href?: string; completo?: boolean }) {
+/** Mark + "vencedital" wordmark. */
+export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href={href} className="logo" aria-label="Radar de Licitações, página inicial">
+    <Link href={href} className="logo" aria-label="Vencedital, página inicial">
       <span className="logo-mark">
         <Mark />
       </span>
-      <span className="logo-word">
-        radar{completo && <small> licitações</small>}
-      </span>
+      <span className="logo-word">vencedital</span>
     </Link>
   );
 }

@@ -23,7 +23,7 @@ export async function sendMail(mail: Mail): Promise<void> {
     console.log(`\n--- e-mail (SMTP_URL não definido) ---\npara: ${mail.to}\nassunto: ${mail.subject}\n\n${mail.text}\n---\n`);
     return;
   }
-  await t.sendMail({ from: process.env.MAIL_FROM ?? "Radar de Licitações <radar@localhost>", ...mail });
+  await t.sendMail({ from: process.env.MAIL_FROM ?? "Vencedital <vencedital@localhost>", ...mail });
 }
 
 export function escapeHtml(s: string): string {

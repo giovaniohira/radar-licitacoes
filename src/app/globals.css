@@ -1,4 +1,4 @@
-/* Radar design system: the "Clareza guiada" prototype with the R mark palette (navy + orange). Plain CSS, light only. */
+/* Vencedital design system: the "Clareza guiada" prototype with the V mark palette (navy + orange). Plain CSS, light only. */
 
 :root {
   --bg: #fafafa;
@@ -196,7 +196,6 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .logo:hover { color: var(--text); text-decoration: none; }
 .logo-mark { width: 28px; height: 28px; flex: none; border-radius: 8px; background: var(--navy); display: grid; place-items: center; }
 .logo-word { font-family: var(--font-display), "Space Grotesk", sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.03em; }
-.logo-word small { font-size: inherit; font-weight: 500; color: var(--subtle); }
 
 /* ---------- App shell ---------- */
 .app { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
@@ -484,11 +483,26 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .numeros b { display: block; font-size: 30px; font-weight: 750; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .numeros span { font-size: 14px; color: var(--muted); }
 .landing-sec { padding-block: 80px; display: flex; flex-direction: column; gap: 32px; }
-.landing-sec h2.big-h { font-size: clamp(28px, 3.4vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; max-width: 640px; }
+.landing-sec h2.big-h, .band h2.big-h { font-size: clamp(28px, 3.4vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; max-width: 640px; }
 .recursos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
 .recursos article { border-top: 2px solid var(--brand); padding-top: 18px; display: flex; flex-direction: column; gap: 8px; }
 .recursos h3 { font-size: 17px; font-weight: 650; }
 .recursos p { font-size: 14px; color: var(--muted); line-height: 1.55; }
+.ia-lista { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px 24px; }
+.ia-lista > div { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-card); }
+.ia-lista dt { font-weight: 650; font-size: 15px; }
+.ia-lista dd { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.5; }
+.precos { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: stretch; }
+.precos .card { gap: 10px; }
+.precos h3 { font-size: 17px; font-weight: 650; }
+.precos .destaque { border: 2px solid var(--navy); }
+.preco { display: flex; align-items: baseline; gap: 4px; }
+.preco b { font-family: var(--font-display), "Space Grotesk", sans-serif; font-size: 40px; font-weight: 800; letter-spacing: -0.03em; }
+.preco span { color: var(--muted); }
+.faq { display: flex; flex-direction: column; border-top: 1px solid var(--line); max-width: 780px; }
+.faq details { border-bottom: 1px solid var(--line); padding: 14px 0; }
+.faq summary { cursor: pointer; font-weight: 600; font-size: 16px; }
+.faq details p { margin-top: 8px; color: var(--muted); font-size: 15px; line-height: 1.6; }
 .como .container { padding-block: 72px; flex-direction: row; flex-wrap: wrap; gap: 48px; }
 .como-passos { flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
 .como-passos h2 { font-size: clamp(26px, 3vw, 34px); font-weight: 800; letter-spacing: -0.03em; }
@@ -512,6 +526,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .prose h1 { font-size: 32px; }
 .prose h2 { font-size: 20px; margin-top: 24px; }
 .prose ul { padding-left: 20px; margin: 0; display: grid; gap: 6px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-card); }
+.prose .table td, .prose .table th { vertical-align: top; line-height: 1.5; }
 
 /* ---------- Entrar ---------- */
 .auth { min-height: 100vh; display: flex; flex-wrap: wrap; background: var(--surface); font-size: 15px; }

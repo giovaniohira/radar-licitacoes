@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { escapeHtml, sendMail, type Mail } from "./mail";
+import { EMPRESA } from "./empresa";
 import { formatBRL, formatData, frase, local, nome, prazo } from "./format";
 import { buildSearch, type EditalResumo } from "./search";
 
@@ -15,6 +16,18 @@ export interface Alert {
 }
 
 export const MAX_POR_ALERTA = 30;
+/** Active plus paused alerts per account. */
+export const MAX_ALERTAS = 20;
+
+/** Legal notice under every digest (docs/empresa/avisos-produto.md §2); the CNPJ only once it is known. */
+export const AVISO_DIGEST = `O alerta é um filtro automático do PNCP: editais podem não aparecer e os dados podem ter erros. Confira sempre o edital oficial. ${[
+  EMPRESA.produto,
+  EMPRESA.razaoSocial,
+  EMPRESA.cnpj && `CNPJ ${EMPRESA.cnpj}`,
+  "sem vínculo com o governo",
+]
+  .filter(Boolean)
+  .join(" · ")}.`;
 
 export async function matchesForAlert(db: Pool, a: Alert): Promise<EditalResumo[]> {
   const { sql, params } = buildSearch(
@@ -53,6 +66,7 @@ export function renderDigest(appUrl: string, grupos: { alert: Alert; editais: Ed
           .join("\n\n"),
     ),
     `\nGerenciar alertas: ${appUrl}/alertas`,
+    `\n${AVISO_DIGEST}`,
   ].join("\n");
 
   const linhas = (g: { alert: Alert; editais: EditalResumo[] }) =>
@@ -71,7 +85,7 @@ export function renderDigest(appUrl: string, grupos: { alert: Alert; editais: Ed
 <tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid ${C.border};border-radius:12px">
 <tr><td style="padding:20px 24px;border-bottom:1px solid ${C.border}">
-<span style="font-weight:700;color:${C.accent}">Radar</span>
+<span style="font-weight:700;color:${C.accent}">Vencedital</span>
 <div style="font-size:20px;font-weight:700;margin-top:8px">${escapeHtml(subject)}</div>
 </td></tr>
 ${grupos
@@ -86,7 +100,8 @@ ${grupos
 <a href="${appUrl}/pipeline" style="display:inline-block;background:${C.accent};color:#fff;font-weight:600;font-size:14px;padding:10px 16px;border-radius:6px;text-decoration:none">Abrir Minhas disputas</a>
 </td></tr>
 </table>
-<p style="font-size:12px;color:${C.muted};max-width:600px">Você recebe este e-mail porque criou alertas no Radar de Licitações. <a href="${appUrl}/alertas" style="color:${C.muted}">Gerenciar alertas</a>.</p>
+<p style="font-size:12px;color:${C.muted};max-width:600px">${escapeHtml(AVISO_DIGEST)}</p>
+<p style="font-size:12px;color:${C.muted};max-width:600px">Você recebe este e-mail porque criou alertas no Vencedital. <a href="${appUrl}/alertas" style="color:${C.muted}">Gerenciar alertas</a>.</p>
 </td></tr></table></body></html>`;
   return { subject, html, text };
 }

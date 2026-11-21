@@ -8,7 +8,7 @@ export default function NotFound() {
   return (
     <main id="conteudo" className="centro">
       <div className="card">
-        <Logo completo />
+        <Logo />
         <h1 style={{ fontSize: 22 }}>Página não encontrada</h1>
         <p className="muted small">O edital, órgão ou fornecedor pode não estar mais no PNCP ou o endereço está incompleto.</p>
         <div className="row" style={{ justifyContent: "center" }}>

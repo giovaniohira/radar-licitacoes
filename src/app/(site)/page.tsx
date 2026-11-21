@@ -5,8 +5,11 @@ import { cacheLife } from "next/cache";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
 import { editalHref, type EditalLinha } from "@/components/ui";
+import { MAX_ALERTAS } from "@/lib/alerts";
 import { query } from "@/lib/db";
+import { DIAS_TESTE, EMPRESA, PRECO_MENSAL } from "@/lib/empresa";
 import { formatBRLCompact, formatDia, formatInt, frase, nome, tituloCurto } from "@/lib/format";
+import { LIMITE_DIARIO } from "@/lib/summary";
 import { LoginForm } from "../entrar/LoginForm";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -24,11 +27,47 @@ const PASSOS = [
   { t: "Marque o que interessa", d: "O edital vai para Minhas disputas com resumo, checklist e prazo na agenda." },
 ];
 
+const IA = [
+  { t: "Objeto", d: "o que o órgão está comprando, sem o juridiquês." },
+  { t: "Prazos", d: "sessão, limite da proposta e vigência." },
+  { t: "Habilitação", d: "as certidões, atestados e registros que o edital exige." },
+  { t: "Exclusividade ME/EPP", d: "se a disputa é reservada." },
+  { t: "Garantia", d: "se pede garantia, e de quanto." },
+  { t: "Pontos de atenção", d: "a amostra em 3 dias, a entrega numa cidade que você não atende." },
+];
+
+const FAQ = [
+  { q: "Quanto custa?", a: `R$ ${PRECO_MENSAL}/mês, com ${DIAS_TESTE} dias grátis. Está na tela, sem "fale com o comercial".` },
+  {
+    q: "De onde vêm os editais?",
+    a: "Do PNCP, o Portal Nacional de Contratações Públicas, que é a fonte oficial e obrigatória da Lei 14.133/2021. Órgãos federais, estaduais e municipais. O Vencedital lê o PNCP três vezes por dia.",
+  },
+  {
+    q: "Cobre minha cidade?",
+    a: "Se o órgão da sua cidade publica no PNCP, sim. Municípios pequenos que ainda só publicam em diário oficial próprio não entram, e o Vencedital não finge que entram.",
+  },
+  {
+    q: "E se eu não souber quais palavras usar?",
+    a: "Você escolhe seu setor e o Vencedital já começa com as palavras que os órgãos realmente escrevem nos editais. Antes de salvar, ele mostra quantos editais abertos aquele alerta pegaria.",
+  },
+  {
+    q: "O resumo da IA pode errar?",
+    a: "Pode. Ele serve para você decidir rápido se vale abrir o edital, não para substituir o edital. Toda tela de resumo tem o link do documento original.",
+  },
+  { q: "O resumo é assessoria jurídica?", a: "Não. Ele resume o edital para você decidir se vale abrir; a decisão e a proposta são suas." },
+  { q: "Preciso de senha?", a: "Não. Você digita o e-mail, recebe um link e entra. Nada de senha para esquecer." },
+  { q: "Vocês são do governo?", a: "Não. Os dados são públicos e vêm do PNCP; o Vencedital não tem nenhum vínculo com o governo." },
+  {
+    q: "Como cancelo?",
+    a: `${EMPRESA.contato ? `Por e-mail para ${EMPRESA.contato}, sem multa.` : "Sem multa e sem fidelidade."} O acesso vai até o fim do mês pago.`,
+  },
+];
+
 // Illustration of the Hoje screen in the hero; the real one is built from the user's data.
 const MOCK = [
-  { n: 1, t: "Juntar 3 documentos dos notebooks", s: "prazo quarta, 10h", urg: true },
+  { n: 1, t: "Juntar 3 documentos dos gêneros alimentícios", s: "prazo quarta, 10h", urg: true },
   { n: 2, t: "Revisar os editais novos do seu ramo", s: "chegaram desde ontem" },
-  { n: 3, t: "Decidir sobre os tablets", s: "o resumo da IA já está pronto" },
+  { n: 3, t: "Decidir sobre o hortifruti", s: "o resumo da IA já está pronto" },
 ];
 
 // The landing's numbers are cached for an hour: they barely move between ingests, and computing them
@@ -95,10 +134,16 @@ export default function Home() {
     <main id="conteudo">
       <section className="container hero">
         <div className="hero-copy">
-          <h1>Nunca mais perca um edital que sua empresa podia ganhar.</h1>
-          <p className="lead">Para quem vende ao governo: todo dia às 7h, os editais novos do seu ramo no seu e-mail. A IA lê o PDF por você, e o Radar lembra dos prazos.</p>
+          <h1>Os editais do seu ramo chegam às 7h. Já lidos.</h1>
+          <p className="lead">
+            Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
+            prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
+          </p>
           <LoginForm variante="hero" />
-          <p className="small subtle">Sem senha e sem cartão. Você entra pelo link que chega no e-mail.</p>
+          <p className="small subtle">{DIAS_TESTE} dias grátis. Sem senha e sem cartão: você entra pelo link que chega no e-mail.</p>
+          <Link href="/buscar" className="small" style={{ fontWeight: 600 }}>
+            Ver licitações abertas agora, sem cadastro →
+          </Link>
         </div>
 
         <div className="hero-mock" aria-hidden>
@@ -127,11 +172,11 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="hoje" className="band" aria-label="O Radar hoje">
+      <section id="hoje" className="band" aria-label="Cobertura do PNCP hoje">
         <div className="container">
           <div className="spread">
-            <h2>O Radar hoje</h2>
-            <span className="small subtle">Números reais, direto do banco do Radar, atualizados todo dia.</span>
+            <h2>Cobertura do PNCP hoje</h2>
+            <span className="small subtle">Lido três vezes por dia, de órgãos municipais, estaduais e federais.</span>
           </div>
           <div className="numeros">
             <Suspense fallback={<div style={{ height: 88 }} />}>
@@ -153,6 +198,26 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="container landing-sec" aria-labelledby="ia-h">
+        <div className="stack" style={{ gap: 10 }}>
+          <h2 id="ia-h" className="big-h">
+            A IA lê o edital. Você lê o resumo.
+          </h2>
+          <p className="muted" style={{ fontSize: 17 }}>
+            Ela abre o PDF e devolve só o que decide se você entra:
+          </p>
+        </div>
+        <dl className="ia-lista">
+          {IA.map((i) => (
+            <div key={i.t}>
+              <dt>{i.t}</dt>
+              <dd>{i.d}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="small muted">O resumo ajuda a decidir rápido. Ele não substitui o edital, e o link do original está sempre ao lado.</p>
+      </section>
+
       <section id="como" className="band como">
         <div className="container">
           <div className="como-passos">
@@ -170,7 +235,7 @@ export default function Home() {
           <div id="email" className="email-previa">
             <div className="h">
               <div>
-                <strong>Radar · hoje, 07:00</strong>
+                <strong>Vencedital · hoje, 07:00</strong>
               </div>
               <div>Editais novos para o seu ramo</div>
             </div>
@@ -182,11 +247,81 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="container landing-sec" aria-labelledby="mercado-h">
+        <h2 id="mercado-h" className="big-h">
+          Antes de dar o preço, veja quem já ganhou
+        </h2>
+        <p className="muted" style={{ fontSize: 17, maxWidth: 640 }}>
+          Cada órgão e cada fornecedor do PNCP tem uma página: o que comprou, de quem, em que faixa de valor e com que frequência.
+        </p>
+        <Link className="btn" href="/mercado" style={{ width: "fit-content" }}>
+          Explorar o mercado →
+        </Link>
+      </section>
+
+      <section id="precos" className="band" aria-labelledby="precos-h">
+        <div className="container">
+          <h2 id="precos-h" className="big-h">
+            Preço na tela, sem falar com vendedor
+          </h2>
+          <div className="precos">
+            <article className="card card-pad stack">
+              <h3>Grátis, sem cadastro</h3>
+              <p className="muted">Busca de licitações, página de cada edital e Mercado.</p>
+              <Link className="btn" href="/buscar" style={{ width: "fit-content" }}>
+                Ver licitações abertas
+              </Link>
+            </article>
+            <article className="card card-pad stack destaque">
+              <h3>Vencedital</h3>
+              <p className="preco">
+                <b className="num">R$ {PRECO_MENSAL}</b>
+                <span>/mês</span>
+              </p>
+              <p className="muted">
+                Até {MAX_ALERTAS} alertas diários, {LIMITE_DIARIO} resumos por IA por dia, Minhas disputas com checklist e prazos na sua agenda.
+              </p>
+              <p className="small">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa. Nota fiscal todo mês.</p>
+              <Link className="btn btn-primary" href="/entrar" style={{ width: "fit-content" }}>
+                Começar teste grátis
+              </Link>
+            </article>
+          </div>
+          <p className="small">
+            <b>Preço de fundador:</b> as 10 primeiras empresas pagam R$ {PRECO_MENSAL}/mês sem reajuste, enquanto a assinatura estiver ativa. Se desistir
+            em até 7 dias do primeiro pagamento, devolvemos tudo. Ao assinar, você aceita os <Link href="/termos">Termos de Uso</Link>.
+          </p>
+        </div>
+      </section>
+
+      <section className="container landing-sec" aria-labelledby="faq-h">
+        <h2 id="faq-h" className="big-h">
+          Perguntas frequentes
+        </h2>
+        <div className="faq">
+          {FAQ.map((f) => (
+            <details key={f.q}>
+              <summary>{f.q}</summary>
+              <p>{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
       <section className="container cta-final">
+        <p className="small muted" style={{ maxWidth: 640 }}>
+          Feito por Giovani Ohira, da {EMPRESA.razaoSocial}, porque achar licitação hoje é uma planilha e muita paciência.
+          {EMPRESA.contato && (
+            <>
+              {" "}
+              Se o resumo errar ou faltar algo, escreva para <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>: quem responde sou eu.
+            </>
+          )}
+        </p>
         <h2>Amanhã às 7h, os editais do seu ramo no seu e-mail.</h2>
         <p>Entre só com seu e-mail, diga o que você vende e pronto.</p>
         <Link className="btn btn-primary" href="/entrar">
-          Começar agora
+          Começar teste grátis
         </Link>
       </section>
     </main>

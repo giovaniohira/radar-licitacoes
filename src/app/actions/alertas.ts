@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { EditalLinha } from "@/components/ui";
+import { MAX_ALERTAS } from "@/lib/alerts";
 import { pool, query } from "@/lib/db";
 import { parseValor } from "@/lib/params";
 import { addToPipeline } from "@/lib/pipeline";
@@ -10,7 +11,6 @@ import { buildSearch, type EditalResumo } from "@/lib/search";
 import { currentUser, requireUser } from "@/lib/session";
 import type { FormState } from "./auth";
 
-const MAX_ALERTAS = 20;
 
 function parseAlerta(form: FormData) {
   const nome = String(form.get("nome") ?? "").trim().slice(0, 80);

@@ -35,6 +35,10 @@ function ResumoView({ r, documento, detalhes }: { r: Resumo; documento?: string;
   return (
     <section className="card" style={{ overflow: "hidden" }}>
       <Cabecalho sub="A IA leu o PDF do edital. Confira no original antes de enviar." />
+      <p className="notice info" role="note" style={{ margin: "12px 16px 0" }}>
+        <strong>Resumo gerado por IA, pode ter erros.</strong> Confira prazos, valores e exigências no edital oficial antes de decidir. Não é assessoria
+        jurídica nem consultoria.
+      </p>
       <Pergunta p="O que estão comprando?">
         <p>{r.objeto}</p>
       </Pergunta>

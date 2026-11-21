@@ -6,7 +6,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <main id="conteudo" className="auth">
       <section className="auth-main">
-        <Logo completo />
+        <Logo />
         <div className="auth-box">
           <div>{children}</div>
         </div>

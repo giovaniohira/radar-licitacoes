@@ -139,7 +139,7 @@ export function fold(line: string): string {
 
 /** iCalendar feed with one event per proposal deadline. */
 export function renderIcs(appUrl: string, itens: Pick<PipelineItem, "edital_id" | "objeto" | "orgao" | "encerramento" | "etapa">[], now = new Date()) {
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Radar de Licitacoes//PT-BR", "X-WR-CALNAME:Radar · prazos de propostas", "CALSCALE:GREGORIAN"];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Vencedital//PT-BR", "X-WR-CALNAME:Vencedital · prazos de propostas", "CALSCALE:GREGORIAN"];
   for (const i of itens) {
     if (!i.encerramento) continue;
     const end = new Date(i.encerramento);

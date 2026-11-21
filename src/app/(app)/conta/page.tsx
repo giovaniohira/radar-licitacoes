@@ -19,7 +19,7 @@ async function Conta({ searchParams }: PageProps<"/conta">) {
     <div className="page narrow" style={{ gap: 20 }}>
       <PageHead title="Conta" sub="Você entra com seu e-mail, sem senha: mandamos um link de acesso a cada login." />
       {first(sp.ok) && <div className="notice ok">E-mail atualizado.</div>}
-      {first(sp.erro) && <div className="notice">Não deu para trocar: esse e-mail passou a ter outra conta no Radar.</div>}
+      {first(sp.erro) && <div className="notice">Não deu para trocar: esse e-mail passou a ter outra conta no Vencedital.</div>}
 
       <section className="card">
         <div className="card-head">
