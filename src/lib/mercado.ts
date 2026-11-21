@@ -63,42 +63,47 @@ const FAIXAS = `case
   when valor_global < 1000000 then '4|R$ 200 mil–1 mi'
   else '5|acima de R$ 1 mi' end`;
 
+/** A ranking query over the CTE `c`, returned as a JSON array with the largest value first. */
+const ranking = (sql: string, limit?: number) =>
+  `(select coalesce(json_agg(x order by x.valor desc), '[]') from (${sql} order by valor desc${limit ? ` limit ${limit}` : ""}) x)`;
+
+/**
+ * Every Mercado figure from one pass over the period: the contracts table is wide (raw PNCP payload), so the
+ * period is read once into the narrow CTE `c` and all aggregates run on that, instead of seven scans.
+ */
 export async function analisar(db: Pool, f: MercadoFiltro) {
   const { where, params, dias } = whereContratos(f);
-  const run = <T extends object>(sql: string) => db.query<T>(sql, params).then((r) => r.rows);
-  const [[totais], serie, orgaos, fornecedores, ufs, faixas, categorias] = await Promise.all([
-    run<Totais>(`select count(*)::int as contratos, coalesce(sum(valor_global), 0)::float8 as valor,
-                        count(distinct fornecedor_ni)::int as fornecedores, count(distinct orgao_cnpj)::int as orgaos,
-                        (percentile_cont(0.5) within group (order by valor_global) filter (where valor_global > 0))::float8 as mediana
-                 from contratos ${where}`),
-    // Every week of the period, including empty ones, so gaps show as gaps instead of wide bars.
-    run<Ponto>(`with s as (
-                  select date_trunc('week', publicado_em)::date as semana, count(*)::int as n, sum(valor_global)::float8 as valor
-                  from contratos ${where} group by 1)
-                select w::date::text as semana, coalesce(s.n, 0) as n, coalesce(s.valor, 0) as valor
-                from generate_series(date_trunc('week', current_date - ${dias}::int), date_trunc('week', current_date), interval '1 week') w
-                left join s on s.semana = w::date
-                order by w`),
-    run<Ranking>(`select orgao_cnpj as id, max(orgao) as nome, count(*)::int as n, coalesce(sum(valor_global), 0)::float8 as valor
-                  from contratos ${where} group by 1 order by valor desc limit 10`),
-    run<Ranking>(`select fornecedor_ni as id, max(fornecedor) as nome, count(*)::int as n, coalesce(sum(valor_global), 0)::float8 as valor
-                  from contratos ${where} and fornecedor_ni is not null group by 1 order by valor desc limit 10`),
-    run<Ranking>(`select uf as id, uf as nome, count(*)::int as n, coalesce(sum(valor_global), 0)::float8 as valor
-                  from contratos ${where} and uf is not null group by 1 order by valor desc`),
-    run<Faixa>(`select ${FAIXAS} as faixa, count(*)::int as n from contratos ${where} and valor_global > 0 group by 1 order by 1`),
-    run<Ranking>(`select coalesce(categoria, 'Outros') as id, coalesce(categoria, 'Outros') as nome, count(*)::int as n,
-                         coalesce(sum(valor_global), 0)::float8 as valor
-                  from contratos ${where} group by 1 order by valor desc limit 8`),
-  ]);
-  return {
-    totais,
-    serie,
-    orgaos,
-    fornecedores,
-    ufs,
-    faixas: faixas.map((x) => ({ ...x, faixa: x.faixa.split("|")[1] })),
-    categorias,
-  };
+  const sql = `with c as materialized (
+      select publicado_em, valor_global, fornecedor_ni, fornecedor, orgao_cnpj, orgao, uf, categoria
+      from contratos ${where}
+    )
+    select
+      (select json_build_object(
+                'contratos', count(*), 'valor', coalesce(sum(valor_global), 0)::float8,
+                'fornecedores', count(distinct fornecedor_ni), 'orgaos', count(distinct orgao_cnpj),
+                'mediana', (percentile_cont(0.5) within group (order by valor_global) filter (where valor_global > 0))::float8)
+       from c) as totais,
+      -- Every week of the period, including empty ones, so gaps show as gaps instead of wide bars.
+      (select coalesce(json_agg(x order by x.semana), '[]') from (
+         select w::date::text as semana, coalesce(s.n, 0) as n, coalesce(s.valor, 0)::float8 as valor
+         from generate_series(date_trunc('week', current_date - ${dias}::int), date_trunc('week', current_date), interval '1 week') w
+         left join (select date_trunc('week', publicado_em)::date as semana, count(*)::int as n, sum(valor_global) as valor from c group by 1) s
+           on s.semana = w::date) x) as serie,
+      ${ranking(`select orgao_cnpj as id, max(orgao) as nome, count(*)::int as n, coalesce(sum(valor_global), 0)::float8 as valor from c group by 1`, 10)} as orgaos,
+      ${ranking(`select fornecedor_ni as id, max(fornecedor) as nome, count(*)::int as n, coalesce(sum(valor_global), 0)::float8 as valor
+                 from c where fornecedor_ni is not null group by 1`, 10)} as fornecedores,
+      ${ranking(`select uf as id, uf as nome, count(*)::int as n, coalesce(sum(valor_global), 0)::float8 as valor from c where uf is not null group by 1`)} as ufs,
+      (select coalesce(json_agg(x order by x.faixa), '[]') from (
+         select ${FAIXAS} as faixa, count(*)::int as n from c where valor_global > 0 group by 1) x) as faixas,
+      ${ranking(`select coalesce(categoria, 'Outros') as id, coalesce(categoria, 'Outros') as nome, count(*)::int as n,
+                        coalesce(sum(valor_global), 0)::float8 as valor from c group by 1`, 8)} as categorias`;
+  const [r] = (
+    await db.query<{ totais: Totais; serie: Ponto[]; orgaos: Ranking[]; fornecedores: Ranking[]; ufs: Ranking[]; faixas: Faixa[]; categorias: Ranking[] }>(
+      sql,
+      params,
+    )
+  ).rows;
+  return { ...r, faixas: r.faixas.map((x) => ({ ...x, faixa: x.faixa.split("|")[1] })) };
 }
 
 export interface ContratoLinha {

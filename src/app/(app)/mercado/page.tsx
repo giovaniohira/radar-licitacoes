@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { cacheLife } from "next/cache";
 import Form from "next/form";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -15,15 +16,24 @@ import { SETORES, UFS } from "@/lib/setores";
 
 export const metadata: Metadata = { title: "Mercado" };
 
+// One analysis reads ~500k contracts and takes ~30 s on the production database (0.5 CPU). Contracts only
+// change at the 06h ingest, so each filter combination is cached for an hour and refreshed in the background:
+// visitors get the cached figures instead of waiting. CI warms the default view after each deploy.
+async function analise(q: string, uf: string, dias: number) {
+  "use cache";
+  cacheLife("hours");
+  const abertos = buildSearch({ palavras: q, ufs: uf ? [uf] : [] }, { limit: 1 });
+  const [m, [aberto]] = await Promise.all([analisar(pool(), { q, uf, dias }), query<{ total: string }>(abertos.sql, abertos.params)]);
+  return { m, nAbertos: Number(aberto?.total ?? 0) };
+}
+
 async function Mercado({ searchParams }: PageProps<"/mercado">) {
   await connection();
   const sp = await searchParams;
   const q = first(sp.q).slice(0, 300);
   const uf = first(sp.uf);
   const dias = PERIODOS.find((p) => String(p) === first(sp.dias)) ?? 90;
-  const abertos = buildSearch({ palavras: q, ufs: uf ? [uf] : [] }, { limit: 1 });
-  const [m, [aberto]] = await Promise.all([analisar(pool(), { q, uf, dias }), query<{ total: string }>(abertos.sql, abertos.params)]);
-  const nAbertos = Number(aberto?.total ?? 0);
+  const { m, nAbertos } = await analise(q, uf, dias);
   const buscaHref = `/buscar?q=${encodeURIComponent(q)}${uf ? `&uf=${uf}` : ""}`;
   const mediana = m.totais.mediana;
   const topo = m.orgaos[0];

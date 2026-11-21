@@ -131,6 +131,8 @@ jobs:
           for _ in $(seq 1 10); do
             if curl -fsS -o /dev/null "$PUBLIC_URL" && curl -fsS -o /dev/null "$PUBLIC_URL/buscar?q=notebook"; then
               echo "### Deployed \`$TAG\` to $PUBLIC_URL" >> "$GITHUB_STEP_SUMMARY"
+              # Warm the Mercado cache (~30 s on the VPS) so the first visitor doesn't wait. Never fails the deploy.
+              curl -sS -m 150 -o /dev/null "$PUBLIC_URL/mercado" || true
               exit 0
             fi
             sleep 3
