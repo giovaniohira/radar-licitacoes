@@ -10,12 +10,6 @@ export type ResumoState = { resumo?: Resumo; documento?: string; error?: string 
 export async function resumir(_: ResumoState, form: FormData): Promise<ResumoState> {
   const user = await requireUser();
   const editalId = String(form.get("edital"));
-  if (user.demo) {
-    const [r] = await query<{ dados: Resumo; documento: string }>(`select dados, documento from resumos where edital_id = $1`, [editalId]);
-    return r
-      ? { resumo: r.dados, documento: r.documento }
-      : { error: "Na conta demo só aparecem resumos que já foram gerados. Crie sua conta para resumir qualquer edital." };
-  }
   if (!process.env.ANTHROPIC_API_KEY) return { error: "Resumo por IA não configurado neste servidor." };
   const [edital] = await query<EditalRow>(`select * from editais where id = $1`, [editalId]);
   if (!edital) return { error: "Edital não encontrado." };

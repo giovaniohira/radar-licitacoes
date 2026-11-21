@@ -33,7 +33,7 @@ export async function matchesForAlert(db: Pool, a: Alert): Promise<EditalResumo[
   return (await db.query<EditalResumo>(sql, params)).rows;
 }
 
-const C = { text: "#18181b", muted: "#5f5f6b", border: "#e6e6e9", accent: "#0f766e", warn: "#a16207", bg: "#fbfbfa" };
+const C = { text: "#18181b", muted: "#5f5f6b", border: "#e6e6e9", accent: "#1e293b", warn: "#b42318", bg: "#fbfbfa" };
 
 /** Table-based HTML so it renders the same in Gmail, Outlook and Apple Mail. */
 export function renderDigest(appUrl: string, grupos: { alert: Alert; editais: EditalResumo[] }[], now = new Date()): Omit<Mail, "to"> {
@@ -83,7 +83,7 @@ ${grupos
   )
   .join("")}
 <tr><td style="padding:20px 24px">
-<a href="${appUrl}/pipeline" style="display:inline-block;background:${C.accent};color:#fff;font-weight:600;font-size:14px;padding:10px 16px;border-radius:6px;text-decoration:none">Abrir meu pipeline</a>
+<a href="${appUrl}/pipeline" style="display:inline-block;background:${C.accent};color:#fff;font-weight:600;font-size:14px;padding:10px 16px;border-radius:6px;text-decoration:none">Abrir Minhas disputas</a>
 </td></tr>
 </table>
 <p style="font-size:12px;color:${C.muted};max-width:600px">Você recebe este e-mail porque criou alertas no Radar de Licitações. <a href="${appUrl}/alertas" style="color:${C.muted}">Gerenciar alertas</a>.</p>
@@ -95,8 +95,7 @@ ${grupos
 export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => void = () => {}): Promise<number> {
   const alerts = (
     await db.query<Alert & { email: string }>(
-      // The demo account is shared and its address is fake, so it never gets mail.
-      `select a.*, u.email from alerts a join users u on u.id = a.user_id where a.ativo and not u.demo order by a.user_id, a.id`,
+      `select a.*, u.email from alerts a join users u on u.id = a.user_id where a.ativo order by a.user_id, a.id`,
     )
   ).rows;
   const porUsuario = new Map<string, (Alert & { email: string })[]>();

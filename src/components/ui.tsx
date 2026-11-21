@@ -1,29 +1,36 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { destacar, dobra, formatBRL, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { formatBRLCompact, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { etapaLabel } from "@/lib/pipeline";
+import { adicionarAoPipeline, removerDoPipeline } from "@/app/actions/pipeline";
 import { Icon } from "./icons";
+import { SubmitButton } from "./SubmitButton";
 
-export function PrazoBadge({ d }: { d: Date | string | null }) {
-  const tom = prazoTom(d);
-  return <span className={`badge${tom === "neutral" ? "" : ` b-${tom}`}`}>{prazo(d)}</span>;
+export const editalHref = (id: string) => `/edital/${encodeURIComponent(id)}`;
+
+/** Compact money for lists; PNCP's secret budgets come as 0. */
+export const valorCurto = (v: number | string | null | undefined) => (v == null || Number(v) === 0 ? "Sigiloso" : formatBRLCompact(v));
+
+export function PrazoPill({ d }: { d: Date | string | null }) {
+  return <span className={`pill${prazoTom(d) === "warn" ? " urg" : ""}`}>{prazo(d)}</span>;
 }
 
-export function PageHead({ title, sub, actions, crumbs }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; crumbs?: ReactNode }) {
+export function PageHead({ eyebrow, title, sub, actions }: { eyebrow?: ReactNode; title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="page-head">
-      <div style={{ minWidth: 0 }}>
-        {crumbs && <div className="crumbs">{crumbs}</div>}
+    <header className="page-head">
+      <div>
+        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
-        {sub && <p>{sub}</p>}
+        {sub && <p className="sub">{sub}</p>}
       </div>
       {actions && <div className="row">{actions}</div>}
-    </div>
+    </header>
   );
 }
 
-export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
+export function Kpi({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
-    <div className="card stat">
+    <div className="kpi">
       <div className="label">{label}</div>
       <div className="value">{value}</div>
       {hint && <div className="hint">{hint}</div>}
@@ -35,13 +42,29 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   return (
     <div className="empty">
       <h3>{title}</h3>
-      {children && <div className="small">{children}</div>}
+      {children && <div>{children}</div>}
     </div>
   );
 }
 
 export function Loading({ label = "Carregando…" }: { label?: string }) {
-  return <div className="page muted">{label}</div>;
+  return (
+    <div className="page" role="status" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <div style={{ display: "grid", gap: 10 }}>
+        <span className="sk" style={{ width: 160, height: 12 }} />
+        <span className="sk" style={{ width: 320, height: 28 }} />
+      </div>
+      <div className="card" style={{ overflow: "hidden" }}>
+        {[70, 55, 80, 60].map((w) => (
+          <div key={w} className="sk-row">
+            <span className="sk" style={{ width: `${w}%`, height: 14 }} />
+            <span className="sk" style={{ width: `${w - 25}%`, height: 10 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export interface EditalLinha {
@@ -52,80 +75,68 @@ export interface EditalLinha {
   municipio: string | null;
   modalidade: string | null;
   valor_estimado: number | string | null;
-  encerramento: Date | null;
+  encerramento: Date | string | null;
 }
 
-export const editalHref = (id: string) => `/edital/${encodeURIComponent(id)}`;
-
-/** One tender in a result list: short title, original object, buyer, value, deadline and optional row actions. */
-export function EditalItem({
-  e,
-  extra,
-  termos,
-  acoes,
-  apagado,
-}: {
-  e: EditalLinha;
-  extra?: ReactNode;
-  /** Alert or search keywords; the first match in the original object is highlighted. */
-  termos?: string;
-  acoes?: ReactNode;
-  apagado?: boolean;
-}) {
-  const objeto = frase(e.objeto);
-  const titulo = tituloCurto(objeto);
-  const hit = termos ? destacar(objeto, termos) : null;
-  const orgao = nome(e.orgao);
-  // "Município de Cairu · Cairu · BA" names the city twice.
-  const lugar = e.municipio && dobra(orgao).includes(dobra(nome(e.municipio))) ? e.uf : local(e.municipio, e.uf);
-  const valor = formatBRL(e.valor_estimado);
-  const urgente = prazoTom(e.encerramento) === "warn";
+/** Horizontal-scroll box for edital rows, so the four columns never squeeze on a phone. */
+export function EditalRows({ children }: { children: ReactNode }) {
   return (
-    <div className={`result${apagado ? " apagado" : ""}`}>
-      <div className="body">
-        <Link href={editalHref(e.id)} className="title clamp2">
-          {titulo}
-        </Link>
-        {titulo !== objeto && (
-          <p className="orig" title={objeto}>
-            {hit ? (
-              <>
-                {hit[0]}
-                <mark className="hl">{hit[1]}</mark>
-                {hit[2]}
-              </>
-            ) : (
-              objeto
-            )}
-          </p>
-        )}
-        <div className="meta">
-          <span>{orgao}</span>
-          {lugar && <span>{lugar}</span>}
-          {e.modalidade && <span>{e.modalidade}</span>}
-          {extra}
-        </div>
-      </div>
-      <div className="side">
-        <div className="cell">
-          <span className={`valor${valor === "Sigiloso" ? " sigiloso" : ""}`}>{valor}</span>
-          <span className="xs subtle">valor estimado</span>
-        </div>
-        <div className="cell">
-          {e.encerramento ? (
-            <>
-              <span className={`quando${urgente ? " urgente" : ""}`}>
-                {urgente && <Icon name="clock" size={14} />}
-                {prazo(e.encerramento)}
-              </span>
-              <span className="xs subtle num">{formatData(e.encerramento)}</span>
-            </>
-          ) : (
-            <span className="quando sem">Sem prazo</span>
-          )}
-        </div>
-        {acoes && <div className="acoes">{acoes}</div>}
-      </div>
+    <div className="table-scroll">
+      <div className="erows">{children}</div>
     </div>
+  );
+}
+
+/** One tender: short title, buyer · UF · modality, estimated value, deadline and the row's actions. */
+export function EditalRow({ e, acoes, apagado }: { e: EditalLinha; acoes?: ReactNode; apagado?: boolean }) {
+  const meta = [nome(e.orgao), e.uf, e.modalidade].filter(Boolean).join(" · ");
+  return (
+    <div className={`erow${apagado ? " apagado" : ""}`}>
+      <div style={{ minWidth: 0 }}>
+        <Link href={editalHref(e.id)} className="t" title={frase(e.objeto)}>
+          {tituloCurto(frase(e.objeto))}
+        </Link>
+        <div className="m">{meta}</div>
+      </div>
+      <div className="v">{valorCurto(e.valor_estimado)}</div>
+      <div>{e.encerramento ? <PrazoPill d={e.encerramento} /> : <span className="pill">sem prazo</span>}</div>
+      <div className="acts">{acoes}</div>
+    </div>
+  );
+}
+
+/** "Tenho interesse" / "Não é pra mim" on an untouched edital; its stage (or an undo for discards) once it is tracked. */
+export function Interesse({ id, etapa }: { id: string; etapa?: string }) {
+  if (etapa === "descartada") {
+    return (
+      <form action={removerDoPipeline}>
+        <input type="hidden" name="edital" value={id} />
+        <span className="xs subtle">Descartado</span>
+        <SubmitButton className="btn btn-ghost btn-sm">Desfazer</SubmitButton>
+      </form>
+    );
+  }
+  if (etapa) {
+    return (
+      <Link className="etapa-tag" href="/pipeline">
+        <Icon name="check" size={13} />
+        {etapaLabel(etapa)}
+      </Link>
+    );
+  }
+  return (
+    <>
+      <form action={adicionarAoPipeline}>
+        <input type="hidden" name="edital" value={id} />
+        <SubmitButton className="btn btn-primary btn-sm">Tenho interesse</SubmitButton>
+      </form>
+      <form action={adicionarAoPipeline}>
+        <input type="hidden" name="edital" value={id} />
+        <input type="hidden" name="etapa" value="descartada" />
+        <SubmitButton className="btn btn-sm" style={{ color: "var(--muted)" }}>
+          Não é pra mim
+        </SubmitButton>
+      </form>
+    </>
   );
 }

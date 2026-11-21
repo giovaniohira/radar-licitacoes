@@ -1,14 +1,12 @@
 // Long-running job runner for the `jobs` container: no cron daemon needed. Hours are Brasília time.
-// 04h reseed the demo account · 06h/12h/18h ingest editais · 06h ingest contracts · 07h send digests.
+// 06h/12h/18h ingest editais · 06h ingest contracts · 07h send digests.
 import { closePool, pool } from "../src/lib/db";
 import { sendDigests } from "../src/lib/alerts";
-import { seedDemo } from "../src/lib/demo";
 import { hojeBR, ingestContratosDia, ingestDia } from "../src/lib/ingest";
 
 const INGEST_HOURS = [6, 12, 18];
 const CONTRATOS_HOUR = 6;
 const DIGEST_HOUR = 7;
-const DEMO_HOUR = 4;
 const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
 function brHour(now = new Date()) {
@@ -37,7 +35,6 @@ async function tick() {
   try {
     // Yesterday too: late publications and updates land after midnight.
     const diasAlvo = [hojeBR(-1, now), hojeBR(0, now)];
-    if (hour === DEMO_HOUR) await step("demo", async () => `usuário ${await seedDemo(pool())}`);
     if (INGEST_HOURS.includes(hour)) {
       for (const dia of diasAlvo) {
         await step(`editais ${dia}`, async () => {

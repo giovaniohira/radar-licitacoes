@@ -86,13 +86,6 @@ describe.skipIf(!url)("database", () => {
     expect(await sendDigests(db, "https://radar.test")).toBe(0);
   });
 
-  it("never mails the shared demo account", async () => {
-    const db = pool();
-    const [{ id }] = (await db.query(`insert into users (email, demo) values ('demo@radar.local', true) returning id`)).rows;
-    await db.query(`insert into alerts (user_id, nome, palavras) values ($1, 'demo', $2)`, [id, fixture[0].objetoCompra.split(/\s+/)[0]]);
-    expect(await sendDigests(db, "https://radar.test")).toBe(0);
-  });
-
   it("keeps pipeline order and seeds the checklist from the AI summary", async () => {
     const db = pool();
     const [{ id: userId }] = (await db.query(`insert into users (email) values ('p@b.com') returning id`)).rows;

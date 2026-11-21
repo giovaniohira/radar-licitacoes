@@ -1,109 +1,142 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/icons";
-import { editalHref } from "@/components/ui";
-import { formatInt, frase, nome } from "@/lib/format";
-import { MODALIDADES } from "@/lib/pncp";
-import { SETORES, UFS } from "@/lib/setores";
-import { criarAlerta, previewAlerta } from "../../actions/alertas";
+import { formatBRLCompact, formatInt } from "@/lib/format";
+import { FAIXAS, SETORES, UFS } from "@/lib/setores";
+import { atualizarAlerta, criarAlerta, previewAlerta } from "../../actions/alertas";
 
-export function NovoAlerta() {
-  const [state, action, pending] = useActionState(criarAlerta, null);
-  const [preview, previewAction, previewing] = useActionState(previewAlerta, null);
-  const palavras = useRef<HTMLTextAreaElement>(null);
-  const nomeRef = useRef<HTMLInputElement>(null);
+export interface AlertaEditavel {
+  id: number;
+  nome: string;
+  palavras: string;
+  ufs: string[];
+  modalidades: number[];
+  valor_min: string | null;
+  valor_max: string | null;
+}
+
+const num = (v: string | null) => (v == null ? "" : String(Number(v)));
+
+/** Four quick questions; the matching count updates as the answers change. Also edits an existing alert. */
+export function NovoAlerta({ editar }: { editar?: AlertaEditavel }) {
+  const [state, action, pending] = useActionState(editar ? atualizarAlerta : criarAlerta, null);
+  const [setores, setSetores] = useState<string[]>([]);
+  const [palavras, setPalavras] = useState(editar?.palavras ?? "");
+  const [nome, setNome] = useState(editar?.nome ?? "");
+  const [ufs, setUfs] = useState<string[]>(editar?.ufs ?? []);
+  const atual = editar ? FAIXAS.findIndex((f) => f.min === num(editar.valor_min) && f.max === num(editar.valor_max)) : 0;
+  // An edited alert with a custom range keeps it as an extra option.
+  const faixas = editar && atual < 0 ? [...FAIXAS, { nome: "Faixa atual", desc: `${formatBRLCompact(editar.valor_min)} a ${formatBRLCompact(editar.valor_max)}`, min: num(editar.valor_min), max: num(editar.valor_max) }] : FAIXAS;
+  const [faixa, setFaixa] = useState(atual < 0 ? FAIXAS.length : atual);
+  const [contagem, setTotal] = useState<number | null>(null);
+  const total = palavras.trim() ? contagem : null;
+  const [, start] = useTransition();
+  const form = useRef<HTMLFormElement>(null);
+
+  function toggleSetor(id: string) {
+    const ids = setores.includes(id) ? setores.filter((s) => s !== id) : [...setores, id];
+    const escolhidos = SETORES.filter((s) => ids.includes(s.id));
+    setSetores(ids);
+    setPalavras(escolhidos.map((s) => s.palavras).join(", "));
+    setNome(escolhidos.map((s) => s.nome).join(" e ").slice(0, 80));
+  }
+
+  // Debounced count of open editais for the current answers.
+  useEffect(() => {
+    if (!palavras.trim()) return;
+    const t = setTimeout(() => start(async () => setTotal((await previewAlerta(null, new FormData(form.current!)))?.total ?? 0)), 400);
+    return () => clearTimeout(t);
+  }, [palavras, ufs, faixa]);
 
   return (
-    <form action={action} className="card">
-      <div className="card-head">
-        <h2>Novo alerta</h2>
+    <form ref={form} action={action} id="novo" className="card novo-alerta" aria-label={editar ? "Editar alerta" : "Novo alerta"}>
+      <div>
+        <h2>{editar ? `Editar “${editar.nome}”` : "Novo alerta"}</h2>
+        <p className="small subtle" style={{ marginTop: 2 }}>
+          4 perguntas rápidas. Dá para mudar tudo depois.
+        </p>
       </div>
-      <div className="card-body stack">
-        <div className="field">
-          <span>Comece por um setor (preenche as palavras-chave)</span>
-          <div className="row">
-            {SETORES.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className="btn btn-sm"
-                onClick={() => {
-                  if (palavras.current) palavras.current.value = s.palavras;
-                  if (nomeRef.current && !nomeRef.current.value) nomeRef.current.value = s.nome;
-                }}
-              >
-                {s.nome}
-              </button>
-            ))}
-          </div>
+      {editar && <input type="hidden" name="id" value={editar.id} />}
+      <input type="hidden" name="nome" value={nome} />
+      {editar?.modalidades.map((m) => <input key={m} type="hidden" name="modalidade" value={m} />)}
+
+      <div className="field">
+        1. O que você vende?
+        <div className="row" style={{ gap: 6 }}>
+          {SETORES.map((s) => (
+            <button key={s.id} type="button" className="chip-link" aria-pressed={setores.includes(s.id)} onClick={() => toggleSetor(s.id)}>
+              {s.nome}
+            </button>
+          ))}
         </div>
-        <label className="field">
-          <span>Nome</span>
-          <input className="input" name="nome" ref={nomeRef} maxLength={80} placeholder="ex.: Notebooks no Sul" />
-        </label>
-        <label className="field">
-          <span>Palavras-chave · vírgula separa alternativas, -palavra exclui</span>
-          <textarea className="input" name="palavras" ref={palavras} required placeholder="notebook, computador portátil, impressora -locação" />
-        </label>
-        <div className="field">
-          <span>Estados (nenhum = Brasil inteiro)</span>
-          <div className="chips">
-            {UFS.map((u) => (
-              <label key={u} className="chip">
-                <input type="checkbox" name="uf" value={u} />
-                <span>{u}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <span>Modalidades (nenhuma = todas)</span>
-          <div className="chips">
-            {Object.entries(MODALIDADES)
-              .filter(([id]) => id !== "9")
-              .map(([id, n]) => (
-                <label key={id} className="chip">
-                  <input type="checkbox" name="modalidade" value={id} />
-                  <span>{n}</span>
+      </div>
+      <label className="field">
+        2. Palavras-chave
+        <input className="input" name="palavras" required value={palavras} onChange={(e) => setPalavras(e.target.value)} placeholder="ex.: limpeza predial, conservação, -dedetização" />
+        <span className="hint">Vírgula separa alternativas. Hífen exclui.</span>
+      </label>
+      <div className="field">
+        3. Em quais estados?
+        <details className="dd">
+          <summary>
+            <span>{ufs.length ? ufs.join(", ") : "Brasil inteiro"}</span>
+          </summary>
+          <div className="menu-pop">
+            <div className="uf-chips">
+              {UFS.map((u) => (
+                <label key={u}>
+                  <input
+                    type="checkbox"
+                    name="uf"
+                    value={u}
+                    checked={ufs.includes(u)}
+                    onChange={(e) => setUfs((xs) => (e.target.checked ? [...xs, u] : xs.filter((x) => x !== u)))}
+                  />
+                  <span>{u}</span>
                 </label>
               ))}
+            </div>
           </div>
-        </div>
-        <div className="grid g2">
-          <label className="field">
-            <span>Valor mínimo (R$)</span>
-            <input className="input" name="min" inputMode="decimal" placeholder="opcional" />
-          </label>
-          <label className="field">
-            <span>Valor máximo (R$)</span>
-            <input className="input" name="max" inputMode="decimal" placeholder="opcional" />
-          </label>
-        </div>
-
-        {preview && (
-          <div className="notice info stack" style={{ gap: 6 }}>
-            <b>{formatInt(preview.total)} editais abertos batem com este alerta agora.</b>
-            {preview.exemplos.map((e) => (
-              <Link key={e.id} href={editalHref(e.id)} className="small" target="_blank">
-                · {frase(e.objeto).slice(0, 110)} ({nome(e.orgao)}, {e.uf})
-              </Link>
-            ))}
-          </div>
-        )}
-        {state?.ok && <div className="notice ok">{state.ok}</div>}
-        {state?.error && <div className="notice danger">{state.error}</div>}
-
-        <div className="row">
-          <button type="submit" className="btn btn-primary" disabled={pending}>
-            <Icon name="bell" size={14} /> {pending ? "Salvando…" : "Criar alerta"}
-          </button>
-          <button className="btn" formAction={previewAction} disabled={previewing} formNoValidate>
-            {previewing ? "Contando…" : "Pré-visualizar resultados"}
-          </button>
-        </div>
+        </details>
       </div>
+      <div className="field">
+        4. Tamanho do contrato
+        <div className="opts">
+          {faixas.map((f, i) => (
+            <label key={f.nome} className="opt">
+              <input type="radio" name="faixa" checked={faixa === i} onChange={() => setFaixa(i)} />
+              <b>{f.nome}</b>
+              <small>{f.desc}</small>
+            </label>
+          ))}
+        </div>
+        <input type="hidden" name="min" value={faixas[faixa]?.min ?? ""} />
+        <input type="hidden" name="max" value={faixas[faixa]?.max ?? ""} />
+      </div>
+
+      {total != null && (
+        <div className="contagem" role="status">
+          <Icon name="check" size={16} />
+          <span>
+            <strong className="num">
+              {formatInt(total)} {total === 1 ? "edital aberto" : "editais abertos"}
+            </strong>{" "}
+            {total === 1 ? "combina" : "combinam"} com esse alerta hoje.
+          </span>
+        </div>
+      )}
+      {state?.ok && <div className="notice ok">{state.ok}</div>}
+      {state?.error && <div className="notice">{state.error}</div>}
+      <button type="submit" className="btn btn-primary" style={{ height: 40, fontSize: 14 }} disabled={pending}>
+        {pending ? "Salvando…" : editar ? "Salvar alterações" : "Criar alerta"}
+      </button>
+      {editar && (
+        <Link href="/alertas" className="small" style={{ textAlign: "center" }}>
+          Cancelar
+        </Link>
+      )}
     </form>
   );
 }

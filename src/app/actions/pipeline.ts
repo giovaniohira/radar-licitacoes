@@ -52,11 +52,6 @@ export async function removerDoPipeline(form: FormData) {
   refresh(editalId);
 }
 
-export async function detalheCard(editalId: string): Promise<CardDetalhe> {
-  const user = await requireUser();
-  return cardDetalhe(pool(), user.id, editalId);
-}
-
 export async function addChecklist(editalId: string, texto: string): Promise<CardDetalhe> {
   const user = await requireUser();
   const t = texto.trim().slice(0, 500);

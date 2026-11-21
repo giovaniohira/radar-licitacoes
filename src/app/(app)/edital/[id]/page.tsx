@@ -1,46 +1,240 @@
-import { Suspense } from "react";
+import { Suspense, cache, type ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { AutoSelect } from "@/components/AutoSelect";
 import { SubmitButton } from "@/components/SubmitButton";
-import { EditalItem, Loading, type EditalLinha } from "@/components/ui";
-import { query } from "@/lib/db";
-import { formatBRL, formatCNPJ, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { Loading, PrazoPill, editalHref, type EditalLinha } from "@/components/ui";
+import { pool, query } from "@/lib/db";
+import { formatBRL, formatCNPJ, formatData, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { fetchArquivos, pncpUrl, type EditalRow } from "@/lib/pncp";
-import { ETAPAS } from "@/lib/pipeline";
+import { cardDetalhe, type Etapa } from "@/lib/pipeline";
 import { currentUser } from "@/lib/session";
 import type { Resumo } from "@/lib/summary";
 import { adicionarAoPipeline, mudarEtapa, removerDoPipeline } from "../../../actions/pipeline";
+import { Checklist, Notas } from "./Disputa";
 import { ResumoIA } from "./ResumoIA";
 
-export const metadata: Metadata = { title: "Edital" };
-
-const ESFERA: Record<string, string> = { M: "Municipal", E: "Estadual", F: "Federal", D: "Distrital" };
-
 type Edital = EditalRow & { valor_estimado: string | null };
+
+// Shared by the page and its metadata so the row is read once per request.
+const getEdital = cache(async (id: string) => (await query<Edital>(`select * from editais where id = $1`, [id]))[0]);
+
+export async function generateMetadata({ params }: PageProps<"/edital/[id]">): Promise<Metadata> {
+  const id = decodeURIComponent((await params).id);
+  const e = await getEdital(id);
+  if (!e) return { title: "Edital não encontrado" };
+  const title = tituloCurto(frase(e.objeto), 70);
+  const description = [
+    `${nome(e.orgao)}${e.uf ? `, ${e.uf}` : ""}`,
+    `Valor estimado: ${formatBRL(e.valor_estimado)}`,
+    `Propostas até ${formatData(e.encerramento)}`,
+  ].join(". ");
+  return { title, description, alternates: { canonical: editalHref(id) }, openGraph: { title, description } };
+}
+
+const TZ = "America/Sao_Paulo";
+const diaSemana = new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, weekday: "short" });
+const diaMes = new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, day: "numeric", month: "short" });
+const horaMin = new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, hour: "numeric", minute: "2-digit", hourCycle: "h23" });
+/** "qua 18 nov, 10h". */
+function quando(d: string | Date | null) {
+  if (!d) return "—";
+  const x = new Date(d);
+  return `${diaSemana.format(x).replace(".", "")} ${diaMes.format(x).replace(" de ", " ").replace(".", "")}, ${horaMin.format(x).replace(":00", "h").replace(":", "h")}`;
+}
+
+const PASSOS: { id: Etapa; label: string }[] = [
+  { id: "triagem", label: "Triagem" },
+  { id: "analise", label: "Em análise" },
+  { id: "preparando", label: "Preparando proposta" },
+  { id: "enviada", label: "Enviada" },
+];
+
+function EtapaForm({ id, etapa, children, primaria }: { id: string; etapa: Etapa; children: ReactNode; primaria?: boolean }) {
+  return (
+    <form action={mudarEtapa}>
+      <input type="hidden" name="edital" value={id} />
+      <input type="hidden" name="etapa" value={etapa} />
+      <SubmitButton className={`btn${primaria ? " btn-primary" : ""}`}>{children}</SubmitButton>
+    </form>
+  );
+}
+
+/** Stage bar plus the one thing to do next, with the buttons that do it. */
+function Disputa({ e, etapa, faltam, logado }: { e: Edital; etapa?: Etapa; faltam: number; logado: boolean }) {
+  const idx = !etapa ? -1 : etapa === "ganha" || etapa === "perdida" ? 4 : PASSOS.findIndex((p) => p.id === etapa);
+  const cls = (i: number) => (i < idx || (i === 4 && idx === 4) ? "feito" : i === idx ? "atual" : undefined);
+  const resultado = etapa === "ganha" ? "Ganha" : etapa === "perdida" ? "Perdida" : "Resultado";
+  const ate = quando(e.encerramento);
+
+  let texto: string;
+  let botoes: ReactNode;
+  if (!logado) {
+    texto = "Decida se vale disputar este edital.";
+    botoes = (
+      <Link className="btn btn-primary" href="/entrar">
+        Entre para acompanhar
+      </Link>
+    );
+  } else if (!etapa) {
+    texto = "Decida se vale disputar este edital.";
+    botoes = (
+      <>
+        <form action={adicionarAoPipeline}>
+          <input type="hidden" name="edital" value={e.id} />
+          <SubmitButton className="btn btn-primary">Tenho interesse</SubmitButton>
+        </form>
+        <form action={adicionarAoPipeline}>
+          <input type="hidden" name="edital" value={e.id} />
+          <input type="hidden" name="etapa" value="descartada" />
+          <SubmitButton className="btn">Não é pra mim</SubmitButton>
+        </form>
+      </>
+    );
+  } else if (etapa === "triagem") {
+    texto = "Leia o resumo e decida se vale disputar.";
+    botoes = (
+      <>
+        <EtapaForm id={e.id} etapa="analise" primaria>
+          Vou disputar
+        </EtapaForm>
+        <EtapaForm id={e.id} etapa="descartada">
+          Descartar
+        </EtapaForm>
+      </>
+    );
+  } else if (etapa === "analise") {
+    texto = "Confira a habilitação e peça cotações aos fornecedores.";
+    botoes = (
+      <>
+        <EtapaForm id={e.id} etapa="preparando" primaria>
+          Começar a proposta
+        </EtapaForm>
+        <EtapaForm id={e.id} etapa="descartada">
+          Descartar
+        </EtapaForm>
+      </>
+    );
+  } else if (etapa === "preparando") {
+    texto = faltam > 0 ? `Junte ${faltam === 1 ? "o documento que falta" : `os ${faltam} documentos que faltam`} até ${ate}.` : `Documentos prontos. Envie a proposta até ${ate}.`;
+    botoes = (
+      <>
+        {faltam > 0 ? (
+          <a className="btn btn-primary" href="#checklist">
+            Ir para o checklist
+          </a>
+        ) : (
+          e.link_origem && (
+            <a className="btn btn-primary" href={e.link_origem} target="_blank" rel="noreferrer">
+              Enviar no portal <Icon name="external" size={14} />
+            </a>
+          )
+        )}
+        <EtapaForm id={e.id} etapa="enviada">
+          Marcar como enviada
+        </EtapaForm>
+      </>
+    );
+  } else if (etapa === "enviada") {
+    texto = "Acompanhe a sessão no portal e registre o resultado aqui.";
+    botoes = (
+      <>
+        <EtapaForm id={e.id} etapa="ganha" primaria>
+          Ganhamos
+        </EtapaForm>
+        <EtapaForm id={e.id} etapa="perdida">
+          Perdemos
+        </EtapaForm>
+      </>
+    );
+  } else if (etapa === "ganha") {
+    texto = "Contrato ganho. Fique de olho na assinatura e no empenho.";
+    botoes = null;
+  } else if (etapa === "perdida") {
+    texto = "Veja quem costuma vencer neste órgão para a próxima disputa.";
+    botoes = (
+      <Link className="btn" href={`/orgao/${e.cnpj}`}>
+        Ver o órgão
+      </Link>
+    );
+  } else {
+    texto = "Você descartou este edital.";
+    botoes = (
+      <EtapaForm id={e.id} etapa="triagem">
+        Desfazer
+      </EtapaForm>
+    );
+  }
+
+  return (
+    <section className="card disputa" aria-label="Disputa">
+      <ol aria-label="Etapas da disputa" className="stepper">
+        {PASSOS.map((p, i) => {
+          const conteudo = (
+            <>
+              <i />
+              <span>
+                {cls(i) === "feito" && "✓ "}
+                {p.label}
+              </span>
+            </>
+          );
+          return (
+            <li key={p.id} className={cls(i)}>
+              {etapa && etapa !== p.id ? (
+                <form action={mudarEtapa} style={{ display: "contents" }}>
+                  <input type="hidden" name="edital" value={e.id} />
+                  <input type="hidden" name="etapa" value={p.id} />
+                  <button aria-label={`Mover para ${p.label}`}>{conteudo}</button>
+                </form>
+              ) : (
+                conteudo
+              )}
+            </li>
+          );
+        })}
+        <li className={cls(4)}>
+          <i />
+          <span>
+            {idx === 4 && "✓ "}
+            {resultado}
+          </span>
+        </li>
+      </ol>
+      <div className="guide">
+        <Icon name="arrowRight" size={20} />
+        <div className="body">
+          <div className="k">Próximo passo</div>
+          <div className="t">{texto}</div>
+        </div>
+        {botoes}
+      </div>
+    </section>
+  );
+}
 
 async function Documentos({ e }: { e: Edital }) {
   let arquivos: Awaited<ReturnType<typeof fetchArquivos>> = [];
   try {
     arquivos = (await fetchArquivos(e, { retries: 1 })).filter((a) => a.statusAtivo);
   } catch {
-    return <p className="small muted">O PNCP não respondeu agora. Veja os documentos direto no portal.</p>;
+    return <p className="card-body small muted">O PNCP não respondeu agora. Veja os documentos direto no portal.</p>;
   }
-  if (!arquivos.length) return <p className="small muted">Nenhum documento publicado no PNCP.</p>;
-  return (
-    <div className="stack" style={{ gap: 6 }}>
-      {arquivos.map((a) => (
-        <a key={a.sequencialDocumento} className="row small link" href={a.url} target="_blank" rel="noreferrer" style={{ flexWrap: "nowrap" }}>
-          <Icon name="file" size={14} />
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.titulo}</span>
-          {a.tipoDocumentoNome && <span className="badge plain">{a.tipoDocumentoNome}</span>}
-        </a>
-      ))}
+  if (!arquivos.length) return <p className="card-body small muted">Nenhum documento publicado no PNCP.</p>;
+  return arquivos.map((a) => (
+    <div key={a.sequencialDocumento} className="file">
+      <span className="ext">{(a.titulo.match(/\.(\w{2,4})$/)?.[1] ?? "PDF").toUpperCase().slice(0, 4)}</span>
+      <div className="nm">
+        <b title={a.titulo}>{a.titulo}</b>
+        {a.tipoDocumentoNome && <small>{a.tipoDocumentoNome}</small>}
+      </div>
+      <a className="small" href={a.url} target="_blank" rel="noreferrer">
+        Baixar
+      </a>
     </div>
-  );
+  ));
 }
 
 async function MaisDoOrgao({ e }: { e: Edital }) {
@@ -49,200 +243,169 @@ async function MaisDoOrgao({ e }: { e: Edital }) {
      from editais where cnpj = $1 and id <> $2 and encerramento > now() order by encerramento limit 4`,
     [e.cnpj, e.id],
   );
-  if (!rows.length) return <div className="card-body small muted">Este órgão não tem outros editais abertos agora.</div>;
-  return rows.map((r) => <EditalItem key={r.id} e={r} />);
-}
-
-async function PipelineAcoes({ e }: { e: Edital }) {
-  const user = await currentUser();
-  if (!user) {
-    return (
-      <Link className="btn" href="/entrar">
-        <Icon name="plus" size={14} /> Acompanhar no pipeline
+  if (!rows.length) return <p className="small muted">Este órgão não tem outros editais abertos agora.</p>;
+  return rows.map((r) => (
+    <div key={r.id} style={{ display: "grid", gap: 4 }}>
+      <Link href={editalHref(r.id)} className="small" style={{ color: "var(--text)", fontWeight: 550 }}>
+        {tituloCurto(frase(r.objeto), 70)}
       </Link>
-    );
-  }
-  const [p] = await query<{ etapa: string }>(`select etapa from pipeline where user_id = $1 and edital_id = $2`, [user.id, e.id]);
-  if (!p) {
-    return (
-      <form action={adicionarAoPipeline}>
-        <input type="hidden" name="edital" value={e.id} />
-        <SubmitButton className="btn" style={{ width: "100%" }}>
-          <Icon name="plus" size={14} /> Acompanhar no pipeline
-        </SubmitButton>
-      </form>
-    );
-  }
-  return (
-    <form action={mudarEtapa} className="field">
-      <span>Etapa no pipeline</span>
-      <input type="hidden" name="edital" value={e.id} />
-      <div className="row" style={{ flexWrap: "nowrap" }}>
-        {/* Keyed by stage: React resets the form after the action, and the reset must land on the saved value. */}
-        <AutoSelect key={p.etapa} className="input" name="etapa" defaultValue={p.etapa} aria-label="Etapa no pipeline">
-          {ETAPAS.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.label}
-            </option>
-          ))}
-        </AutoSelect>
-        <details className="menu">
-          <summary className="btn btn-icon" aria-label="Mais ações" title="Mais ações">
-            ⋯
-          </summary>
-          <div className="menu-pop">
-            <button className="btn btn-ghost btn-danger" formAction={removerDoPipeline}>
-              <Icon name="trash" size={14} /> Remover do pipeline
-            </button>
-          </div>
-        </details>
-      </div>
-    </form>
-  );
-}
-
-async function ResumoBloco({ e }: { e: Edital }) {
-  const [user, [resumo]] = await Promise.all([
-    currentUser(),
-    query<{ dados: Resumo; documento: string }>(`select dados, documento from resumos where edital_id = $1`, [e.id]),
-  ]);
-  if (!user && !resumo) {
-    return (
-      <div className="card card-body stack resumo-cta">
-        <p className="muted">A IA lê o PDF do edital e extrai prazos, habilitação, exclusividade ME/EPP e pontos de atenção.</p>
-        <div>
-          <Link className="btn btn-primary" href="/entrar">
-            <Icon name="sparkles" size={14} /> Entre para resumir
-          </Link>
-        </div>
-      </div>
-    );
-  }
-  return <ResumoIA editalId={e.id} inicial={resumo ? { resumo: resumo.dados, documento: resumo.documento } : null} />;
+      <span>
+        <PrazoPill d={r.encerramento} />
+      </span>
+    </div>
+  ));
 }
 
 async function Edital({ params }: PageProps<"/edital/[id]">) {
   await connection();
   const id = decodeURIComponent((await params).id);
-  const [e] = await query<Edital>(`select * from editais where id = $1`, [id]);
+  const e = await getEdital(id);
   if (!e) notFound();
+  const user = await currentUser();
+  const [[p], [resumo]] = await Promise.all([
+    user ? query<{ etapa: Etapa; valor_proposta: number | null }>(`select etapa, valor_proposta::float8 as valor_proposta from pipeline where user_id = $1 and edital_id = $2`, [user.id, e.id]) : Promise.resolve([]),
+    query<{ dados: Resumo; documento: string }>(`select dados, documento from resumos where edital_id = $1`, [e.id]),
+  ]);
+  const det = user && p ? await cardDetalhe(pool(), user.id, e.id) : null;
+  const faltam = det ? det.checklist.filter((c) => !c.feito).length : 0;
 
   const objeto = frase(e.objeto);
   const titulo = tituloCurto(objeto);
+  const aberto = !!e.encerramento && prazo(e.encerramento) !== "encerrado";
+  const urgente = prazoTom(e.encerramento) === "warn";
+  const unidade = e.unidade && nome(e.unidade) !== nome(e.orgao) ? nome(e.unidade) : null;
+
+  const detalhes = (
+    <details>
+      <summary>Ver objeto completo e todos os detalhes</summary>
+      <dl className="kv">
+        <dt>Objeto completo</dt>
+        <dd>{objeto}</dd>
+        {e.info_complementar && (
+          <>
+            <dt>Informação complementar</dt>
+            <dd>{frase(e.info_complementar)}</dd>
+          </>
+        )}
+        <dt>Unidade compradora</dt>
+        <dd>{nome(e.unidade ?? e.orgao)}</dd>
+        <dt>CNPJ do órgão</dt>
+        <dd className="num">{formatCNPJ(e.cnpj)}</dd>
+        <dt>Situação</dt>
+        <dd>{e.situacao ?? "—"}</dd>
+        <dt>Publicado no PNCP</dt>
+        <dd>{formatData(e.publicado_em)}</dd>
+        <dt>Nº de controle</dt>
+        <dd>{e.id}</dd>
+      </dl>
+    </details>
+  );
+
   return (
-    <div className="page">
+    <div className="page" style={{ gap: 20 }}>
       <nav className="crumbs" aria-label="Você está em">
-        <Link href="/buscar">Buscar</Link>/<Link href={`/orgao/${e.cnpj}`}>{nome(e.orgao)}</Link>
+        {p ? <Link href="/pipeline">Minhas disputas</Link> : <Link href="/buscar">Encontrar editais</Link>}
+        <span>/</span>
+        <span>{e.modalidade ?? "Edital"}</span>
       </nav>
+
       <header className="edital-head">
-        <div className="stack" style={{ gap: 10, minWidth: 0 }}>
-          <div className="row" style={{ gap: 6 }}>
-            {e.modalidade && <span className="tag outline">{e.modalidade}</span>}
-            {e.srp && <span className="tag outline">Registro de preços</span>}
-            {e.esfera && ESFERA[e.esfera] && <span className="tag outline">{ESFERA[e.esfera]}</span>}
+        <div>
+          <div className="pills">
+            {aberto ? <span className="pill ok">Aberto</span> : <span className="pill">Encerrado</span>}
+            {e.modalidade && <span className="pill">{e.modalidade}</span>}
+            {e.srp && <span className="pill">Registro de preços</span>}
+            {resumo?.dados.exclusivo_me_epp && <span className="pill">Cota ME/EPP</span>}
           </div>
           <h1>{titulo}</h1>
-          {titulo !== objeto && (
-            <p className="clamp2 subtle" title={objeto} style={{ maxWidth: 780 }}>
-              {objeto}
-            </p>
-          )}
-          <p className="small muted">
-            <Icon name="building" size={14} />{" "}
-            <Link className="link" href={`/orgao/${e.cnpj}`}>
-              {nome(e.orgao)}
-            </Link>{" "}
-            · {local(e.municipio, e.uf)}
+          <p>
+            <Link href={`/orgao/${e.cnpj}`}>{nome(e.orgao)}</Link>
+            {e.uf && ` · ${e.uf}`}
+            {unidade && ` · ${unidade}`}
           </p>
         </div>
-        <div className="edital-acoes">
-          <Suspense fallback={<span className="btn" style={{ width: "100%" }} />}>
-            <PipelineAcoes e={e} />
-          </Suspense>
-          <div className="row" style={{ flexWrap: "nowrap" }}>
-            {e.link_origem && (
-              <a className="btn btn-primary" style={{ flex: 1 }} href={e.link_origem} target="_blank" rel="noreferrer">
-                Enviar proposta no portal <Icon name="external" size={14} />
-              </a>
-            )}
-            <a className="btn" style={e.link_origem ? undefined : { flex: 1 }} href={pncpUrl(e)} target="_blank" rel="noreferrer">
-              Ver no PNCP <Icon name="external" size={14} />
-            </a>
-          </div>
+        <div className="row">
+          <a className="btn" href={pncpUrl(e)} target="_blank" rel="noreferrer">
+            Abrir no PNCP
+          </a>
+          {(e.link_origem || p) && (
+            <details className="menu">
+              <summary className="btn btn-icon" aria-label="Mais ações">
+                ···
+              </summary>
+              <div className="menu-pop">
+                {e.link_origem && (
+                  <a className="btn btn-ghost" href={e.link_origem} target="_blank" rel="noreferrer">
+                    Enviar proposta no portal <Icon name="external" size={14} />
+                  </a>
+                )}
+                {p && (
+                  <form action={removerDoPipeline}>
+                    <input type="hidden" name="edital" value={e.id} />
+                    <SubmitButton className="btn btn-ghost" style={{ color: "var(--danger)", width: "100%", justifyContent: "flex-start" }}>
+                      Remover de Minhas disputas
+                    </SubmitButton>
+                  </form>
+                )}
+              </div>
+            </details>
+          )}
         </div>
       </header>
 
-      <section className="card facts" aria-label="Fatos principais">
+      <Disputa e={e} etapa={p?.etapa} faltam={faltam} logado={!!user} />
+
+      <section aria-label="Dados principais" className="card facts">
         <div>
           <span>Valor estimado</span>
           <b>{formatBRL(e.valor_estimado)}</b>
-          <small>{e.srp ? "Registro de preços, por demanda" : "Total estimado"}</small>
+          {e.srp && <small>registro de preços, por demanda</small>}
         </div>
-        <div>
+        <div className={urgente ? "urg" : undefined}>
           <span>Propostas até</span>
-          <b>{formatData(e.encerramento)}</b>
-          <small className={prazoTom(e.encerramento) === "warn" ? "urgente" : undefined}>{prazo(e.encerramento)}</small>
+          <b>{quando(e.encerramento)}</b>
+          <small>{prazo(e.encerramento).replace(/^em /, "faltam ")}</small>
         </div>
         <div>
-          <span>Abertura</span>
-          <b>{formatData(e.abertura)}</b>
-          <small>Publicado no PNCP em {formatData(e.publicado_em)}</small>
+          <span>Abertura das propostas</span>
+          <b>{quando(e.abertura)}</b>
         </div>
         <div>
-          <span>Situação</span>
-          <b>{e.situacao ?? "—"}</b>
-          <small>{(e.esfera && ESFERA[e.esfera]) ?? "—"}</small>
+          <span>{resumo ? "Ganha quem" : "Situação"}</span>
+          <b style={{ fontSize: 17 }}>{resumo ? resumo.dados.criterio_julgamento : (e.situacao ?? "—")}</b>
         </div>
       </section>
 
-      <div className="grid cols-main">
-        <div className="stack-lg">
-          <Suspense fallback={<div className="card card-body muted">Carregando o resumo…</div>}>
-            <ResumoBloco e={e} />
-          </Suspense>
-          <section className="card">
+      <div className="cols">
+        <div className="col-main">
+          <ResumoIA editalId={e.id} logado={!!user} inicial={resumo ? { resumo: resumo.dados, documento: resumo.documento } : null} detalhes={detalhes} />
+          <section className="card" style={{ overflow: "hidden" }}>
             <div className="card-head">
-              <h2>Detalhes</h2>
+              <h2>Arquivos do edital</h2>
             </div>
-            <div className="card-body">
-              <dl className="kv">
-                <dt>Objeto completo</dt>
-                <dd>{objeto}</dd>
-                {e.info_complementar && (
-                  <>
-                    <dt>Informação complementar</dt>
-                    <dd>{frase(e.info_complementar)}</dd>
-                  </>
-                )}
-                <dt>Unidade compradora</dt>
-                <dd>{nome(e.unidade ?? e.orgao)}</dd>
-                <dt>CNPJ do órgão</dt>
-                <dd className="num">{formatCNPJ(e.cnpj)}</dd>
-                <dt>Nº de controle</dt>
-                <dd className="mono">{e.id}</dd>
-              </dl>
-            </div>
-          </section>
-        </div>
-
-        <aside className="rail">
-          <section className="card">
-            <h2>Arquivos</h2>
-            <Suspense fallback={<p className="small muted">Consultando o PNCP…</p>}>
+            <Suspense fallback={<p className="card-body small muted">Consultando o PNCP…</p>}>
               <Documentos e={e} />
             </Suspense>
           </section>
-          <section className="card" style={{ padding: 0, gap: 0 }}>
-            <div className="card-head">
-              <h2>Mais deste órgão</h2>
-              <Link className="link small" href={`/orgao/${e.cnpj}`}>
-                Ver perfil
-              </Link>
-            </div>
-            <Suspense fallback={<div className="card-body small muted">Carregando…</div>}>
-              <MaisDoOrgao e={e} />
-            </Suspense>
-          </section>
+        </div>
+
+        <aside className="col-side">
+          {det ? (
+            <>
+              <Checklist editalId={e.id} inicial={det.checklist} temResumo={!!resumo} />
+              <Notas editalId={e.id} inicial={det.notas} valorProposta={p?.valor_proposta ?? null} valorEstimado={e.valor_estimado} />
+            </>
+          ) : (
+            <section className="card card-pad stack">
+              <div className="card-title">
+                <h2>Mais deste órgão</h2>
+                <Link href={`/orgao/${e.cnpj}`}>Ver órgão</Link>
+              </div>
+              <Suspense fallback={<p className="small muted">Carregando…</p>}>
+                <MaisDoOrgao e={e} />
+              </Suspense>
+            </section>
+          )}
         </aside>
       </div>
     </div>

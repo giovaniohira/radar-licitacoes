@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { hashToken, icsToken, newLoginToken, normalizeEmail, signSession, verifyIcsToken, verifySession } from "@/lib/auth";
 import { renderDigest, type Alert } from "@/lib/alerts";
-import { destacar, formatBRL, formatDia, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
 import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
 import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
+import { PRIVADAS, robotsFor } from "@/lib/robots";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
 
 const KEY = "k".repeat(40);
@@ -14,7 +15,8 @@ describe("session", () => {
   it("round-trips and rejects tampering", () => {
     const now = Date.UTC(2026, 9, 16);
     const s = signSession(42, now, KEY);
-    expect(verifySession(s, now, KEY)).toBe(42);
+    expect(verifySession(s, now, KEY)?.id).toBe(42);
+    expect(verifySession(s, now, KEY)?.emitida).toBe(Math.floor(now / 1000));
     expect(verifySession(s.replace(/^42/, "43"), now, KEY)).toBeNull();
     expect(verifySession(s, now, "x".repeat(40))).toBeNull();
     expect(verifySession("lixo", now, KEY)).toBeNull();
@@ -23,7 +25,7 @@ describe("session", () => {
   it("expires after 30 days", () => {
     const now = Date.UTC(2026, 9, 16);
     const s = signSession(1, now, KEY);
-    expect(verifySession(s, now + 29 * 86400_000, KEY)).toBe(1);
+    expect(verifySession(s, now + 29 * 86400_000, KEY)?.id).toBe(1);
     expect(verifySession(s, now + 31 * 86400_000, KEY)).toBeNull();
   });
   it("login tokens are random and stored hashed", () => {
@@ -92,6 +94,11 @@ describe("format", () => {
     expect(prazo("2026-10-17T13:00:00Z", now)).toBe("amanhã");
     expect(prazo("2026-10-26T13:00:00Z", now)).toBe("em 10 dias");
     expect(prazo(null, now)).toBe("sem prazo");
+  });
+  it("drops the city when the buyer already names it", () => {
+    expect(local("CAIRU", "BA")).toBe("Cairu · BA");
+    expect(local("CAIRU", "BA", "MUNICIPIO DE CAIRU")).toBe("BA");
+    expect(local("SÃO PAULO", "SP", "Secretaria Municipal de Saúde")).toBe("São Paulo · SP");
   });
   it("treats 0 as secret budget", () => {
     expect(formatBRL(0)).toBe("Sigiloso");
@@ -259,5 +266,19 @@ describe("destacar", () => {
     expect(destacar("Aquisição de Computadores e notebooks", "notebook, computador")).toEqual(["Aquisição de ", "Computador", "es e notebooks"]);
     expect(destacar("Serviço de manutenção", "manutencao -predial")).toEqual(["Serviço de ", "manutenção", ""]);
     expect(destacar("Pneus", "notebook")).toBeNull();
+  });
+});
+
+describe("robots", () => {
+  it("disallows the private routes at a domain root", () => {
+    const r = robotsFor("https://exemplo.com.br");
+    expect(r.sitemap).toBe("https://exemplo.com.br/sitemap.xml");
+    expect(r.rules).toEqual({ userAgent: "*", allow: "/", disallow: PRIVADAS });
+  });
+
+  it("prefixes every path under a sub-path deploy", () => {
+    const r = robotsFor("https://apps.giovaniohira.com/radar/");
+    expect(r.sitemap).toBe("https://apps.giovaniohira.com/radar/sitemap.xml");
+    expect(r.rules).toMatchObject({ allow: "/radar/", disallow: expect.arrayContaining(["/radar/painel", "/radar/entrar/confirmar"]) });
   });
 });

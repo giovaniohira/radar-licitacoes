@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Shell } from "@/components/Shell";
+import { ContaLink, Shell } from "@/components/Shell";
 import { Icon } from "@/components/icons";
 import { currentUser } from "@/lib/session";
 import { sair } from "../actions/auth";
@@ -9,35 +9,22 @@ async function UserBox() {
   const user = await currentUser();
   if (!user) {
     return (
-      <Link href="/entrar" className="btn btn-primary" style={{ width: "100%" }}>
+      <Link href="/entrar" className="btn btn-primary btn-block">
         Entrar
       </Link>
     );
   }
   return (
-    <>
-      {user.demo && (
-        <div className="demo-box">
-          <p>
-            <b>Você está na demo.</b> Os dados voltam ao início todo dia às 4h.
-          </p>
-          <Link href="/entrar" className="btn btn-sm">
-            Criar minha conta
-          </Link>
-        </div>
-      )}
-      <div className="user-box">
-        <span className="avatar">{user.email[0]}</span>
-        <span className="email" title={user.email}>
-          {user.demo ? "Conta demo" : user.email}
-        </span>
-        <form action={sair} style={{ marginLeft: "auto" }}>
-          <button className="btn btn-ghost btn-sm" aria-label="Sair" title="Sair">
-            <Icon name="logout" size={14} />
-          </button>
-        </form>
-      </div>
-    </>
+    <div className="user-box">
+      <Suspense>
+        <ContaLink email={user.email} />
+      </Suspense>
+      <form action={sair}>
+        <button className="btn btn-ghost btn-icon" aria-label="Sair" title="Sair">
+          <Icon name="logout" size={15} />
+        </button>
+      </form>
+    </div>
   );
 }
 

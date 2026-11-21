@@ -5,11 +5,10 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Bars, HBars } from "@/components/charts";
 import { Icon } from "@/components/icons";
-import { ContratosTabela } from "@/components/ContratosTabela";
-import { Empty, Loading, PageHead, Stat } from "@/components/ui";
+import { Empty, Kpi, Loading, PageHead } from "@/components/ui";
 import { pool, query } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatInt, nome } from "@/lib/format";
-import { PERIODOS, analisar, contratosRecentes } from "@/lib/mercado";
+import { PERIODOS, analisar } from "@/lib/mercado";
 import { first, withParams } from "@/lib/params";
 import { buildSearch } from "@/lib/search";
 import { SETORES, UFS } from "@/lib/setores";
@@ -22,48 +21,47 @@ async function Mercado({ searchParams }: PageProps<"/mercado">) {
   const q = first(sp.q).slice(0, 300);
   const uf = first(sp.uf);
   const dias = PERIODOS.find((p) => String(p) === first(sp.dias)) ?? 90;
-  const f = { q, uf, dias };
   const abertos = buildSearch({ palavras: q, ufs: uf ? [uf] : [] }, { limit: 1 });
-  const [m, recentes, [aberto]] = await Promise.all([
-    analisar(pool(), f),
-    contratosRecentes(pool(), f, 15),
-    query<{ total: string }>(abertos.sql, abertos.params),
-  ]);
+  const [m, [aberto]] = await Promise.all([analisar(pool(), { q, uf, dias }), query<{ total: string }>(abertos.sql, abertos.params)]);
   const nAbertos = Number(aberto?.total ?? 0);
+  const buscaHref = `/buscar?q=${encodeURIComponent(q)}${uf ? `&uf=${uf}` : ""}`;
+  const mediana = m.totais.mediana;
+  const topo = m.orgaos[0];
 
   return (
-    <div className="page">
-      <PageHead
-        title="Inteligência de mercado"
-        sub="Contratos publicados no PNCP: quem compra, quem vence e por quanto."
-        actions={
-          <div className="seg">
+    <div className="page" style={{ gap: 20 }}>
+      <PageHead title="Mercado" sub="Contratos publicados no PNCP: quem compra, quem vence e por quanto." />
+
+      <Form action="/mercado" className="card card-pad stack">
+        <input type="hidden" name="dias" value={dias} />
+        <div className="row" style={{ alignItems: "stretch" }}>
+          <label className="searchbox" style={{ flexBasis: 320 }}>
+            <Icon name="search" size={18} />
+            <span className="sr-only">Qual mercado?</span>
+            <input name="q" defaultValue={q} placeholder="Qual mercado? ex.: notebook, merenda escolar, pavimentação" />
+          </label>
+          <label>
+            <span className="sr-only">Estado</span>
+            <select className="input input-lg" name="uf" defaultValue={uf} style={{ width: "auto", height: "100%" }}>
+              <option value="">Brasil</option>
+              {UFS.map((u) => (
+                <option key={u}>{u}</option>
+              ))}
+            </select>
+          </label>
+          <div className="seg lg" aria-label="Período">
             {PERIODOS.map((p) => (
-              <Link key={p} href={`/mercado${withParams(sp, { dias: String(p) })}`} aria-current={p === dias}>
+              <Link key={p} href={`/mercado${withParams(sp, { dias: String(p) })}`} aria-current={p === dias ? "true" : undefined}>
                 {p === 365 ? "12 meses" : `${p} dias`}
               </Link>
             ))}
           </div>
-        }
-      />
-      <Form action="/mercado" className="card card-body stack" style={{ marginBottom: 20 }}>
-        <input type="hidden" name="dias" value={dias} />
-        <div className="searchbar">
-          <input className="input input-lg" name="q" defaultValue={q} placeholder="Qual mercado? ex.: notebook, merenda escolar, pavimentação" aria-label="Mercado" />
-          <select className="input input-lg" name="uf" defaultValue={uf} aria-label="Estado" style={{ flex: "0 0 112px" }}>
-            <option value="">Brasil</option>
-            {UFS.map((u) => (
-              <option key={u}>{u}</option>
-            ))}
-          </select>
-          <button className="btn btn-primary btn-lg">
-            <Icon name="chart" /> Analisar
-          </button>
+          <button className="sr-only">Analisar</button>
         </div>
-        <div className="row">
-          <span className="xs subtle">Setores:</span>
+        <div className="row small" style={{ gap: 6 }}>
+          <span className="muted">Setores:</span>
           {SETORES.map((s) => (
-            <Link key={s.id} className="btn btn-sm" href={`/mercado?q=${encodeURIComponent(s.palavras)}&dias=${dias}${uf ? `&uf=${uf}` : ""}`}>
+            <Link key={s.id} className="chip-link" href={`/mercado?q=${encodeURIComponent(s.palavras)}&dias=${dias}${uf ? `&uf=${uf}` : ""}`}>
               {s.nome}
             </Link>
           ))}
@@ -75,78 +73,51 @@ async function Mercado({ searchParams }: PageProps<"/mercado">) {
           <Empty title="Nenhum contrato encontrado no período">Tente outras palavras, outro estado ou um período maior.</Empty>
         </div>
       ) : (
-        <div className="stack-lg">
-          <div className="grid g4">
-            <Stat label="Contratos publicados" value={formatInt(m.totais.contratos)} hint={`${formatInt(m.totais.orgaos)} órgãos compradores`} />
-            <Stat label="Valor contratado" value={formatBRLCompact(m.totais.valor)} hint="soma do valor global" />
-            <Stat label="Contrato mediano" value={formatBRL(m.totais.mediana)} hint="metade dos contratos fica abaixo" />
-            <Stat
-              label="Editais abertos agora"
-              value={formatInt(nAbertos)}
-              hint={
-                <Link className="link" href={`/buscar?q=${encodeURIComponent(q)}${uf ? `&uf=${uf}` : ""}`}>
-                  ver na busca
-                </Link>
-              }
-            />
+        <>
+          <div className="guide">
+            <Icon name="sparkle" size={20} />
+            <p className="body" style={{ fontSize: 14, color: "var(--navy)", lineHeight: 1.5 }}>
+              <strong>Em resumo:</strong> metade dos contratos{q ? ` de ${q.split(",")[0].trim()}` : ""} ficou abaixo de {formatBRLCompact(mediana)}
+              {mediana != null && mediana <= 80000 ? ", uma faixa com disputa exclusiva para ME/EPP" : ""}.{" "}
+              {topo && `${nome(topo.nome)} foi quem mais comprou no período.`}
+            </p>
+            {nAbertos > 0 && (
+              <Link className="btn btn-primary" href={buscaHref}>
+                Ver {formatInt(nAbertos)} {nAbertos === 1 ? "edital aberto" : "editais abertos"}
+              </Link>
+            )}
           </div>
 
-          <section className="card">
-            <div className="card-head">
+          <section aria-label="Totais" className="kpis">
+            <Kpi label="Contratos publicados" value={formatInt(m.totais.contratos)} hint={`${formatInt(m.totais.orgaos)} órgãos compradores`} />
+            <Kpi label="Valor contratado" value={formatBRLCompact(m.totais.valor)} hint="soma do valor global" />
+            <Kpi label="Contrato mediano" value={formatBRL(mediana)} hint="metade dos contratos fica abaixo" />
+            <Kpi label="Editais abertos agora" value={formatInt(nAbertos)} hint={<Link href={buscaHref}>ver na busca</Link>} />
+          </section>
+
+          <section className="card card-pad stack" style={{ gap: 14 }}>
+            <div className="card-title">
               <h2>Valor contratado por semana</h2>
               <span className="xs subtle">{formatInt(m.totais.fornecedores)} fornecedores distintos</span>
             </div>
-            <div className="card-body">
-              <Bars points={m.serie} />
-            </div>
+            <Bars points={m.serie} />
           </section>
 
-          <div className="grid g2">
-            <section className="card">
-              <div className="card-head">
-                <h2>Quem mais compra</h2>
-              </div>
-              <div className="card-body">
-                <HBars rows={m.orgaos.map((o) => ({ ...o, nome: nome(o.nome) }))} href={(id) => `/orgao/${id}`} />
-              </div>
+          <div className="duo">
+            <section className="card card-pad stack" style={{ gap: 10 }}>
+              <h2 style={{ marginBottom: 4 }}>Quem mais compra</h2>
+              <HBars rows={m.orgaos.map((o) => ({ ...o, nome: nome(o.nome) }))} href={(id) => `/orgao/${id}`} />
             </section>
-            <section className="card">
-              <div className="card-head">
-                <h2>Quem mais vence</h2>
-              </div>
-              <div className="card-body">
-                {m.fornecedores.length ? (
-                  <HBars rows={m.fornecedores.map((o) => ({ ...o, nome: nome(o.nome) }))} href={(id) => `/fornecedor/${id}`} />
-                ) : (
-                  <p className="small muted">Sem fornecedores pessoa jurídica no período.</p>
-                )}
-              </div>
-            </section>
-            <section className="card">
-              <div className="card-head">
-                <h2>Tamanho dos contratos</h2>
-              </div>
-              <div className="card-body">
-                <HBars rows={m.faixas.map((x) => ({ id: x.faixa, nome: x.faixa, n: x.n, valor: 0 }))} metric="n" />
-              </div>
-            </section>
-            <section className="card">
-              <div className="card-head">
-                <h2>Por estado</h2>
-              </div>
-              <div className="card-body">
-                <HBars rows={m.ufs.slice(0, 10)} href={(id) => `/mercado${withParams(sp, { uf: id })}`} />
-              </div>
+            <section className="card card-pad stack" style={{ gap: 10 }}>
+              <h2 style={{ marginBottom: 4 }}>Quem mais vence</h2>
+              {m.fornecedores.length ? (
+                <HBars escuro rows={m.fornecedores.map((o) => ({ ...o, nome: nome(o.nome) }))} href={(id) => `/fornecedor/${id}`} />
+              ) : (
+                <p className="small muted">Sem fornecedores pessoa jurídica no período.</p>
+              )}
             </section>
           </div>
-
-          <section className="card">
-            <div className="card-head">
-              <h2>Contratos mais recentes</h2>
-            </div>
-            <ContratosTabela rows={recentes} />
-          </section>
-        </div>
+        </>
       )}
     </div>
   );

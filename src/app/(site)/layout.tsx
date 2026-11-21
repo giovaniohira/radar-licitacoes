@@ -1,49 +1,40 @@
 import Link from "next/link";
 import { Logo } from "@/components/icons";
-import { entrarDemo } from "../actions/auth";
 
 export default function SiteLayout({ children }: LayoutProps<"/">) {
   return (
-    <>
-      <header className="site-nav">
+    <div className="landing">
+      <header className="site-head">
         <div className="container">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <nav>
-            <Link className="btn btn-ghost hide-sm" href="/#como">
-              Como funciona
-            </Link>
-            <Link className="btn btn-ghost hide-sm" href="/buscar">
-              Buscar editais
-            </Link>
-            <Link className="btn btn-ghost hide-sm" href="/mercado">
-              Mercado
-            </Link>
-            <Link className="btn btn-ghost" href="/entrar">
+          <Logo completo />
+          <nav aria-label="Site">
+            <Link href="/#como">Como funciona</Link>
+            <Link href="/#hoje">O Radar hoje</Link>
+            <Link href="/#email">E-mail diário</Link>
+          </nav>
+          <div className="acts">
+            <Link className="btn btn-ghost" href="/entrar" style={{ color: "var(--text)" }}>
               Entrar
             </Link>
-            <form action={entrarDemo}>
-              <button className="btn btn-primary">Ver a demo</button>
-            </form>
-          </nav>
+            <Link className="btn btn-primary" href="/entrar">
+              Começar agora
+            </Link>
+          </div>
         </div>
       </header>
       {children}
-      <footer className="site-footer">
-        <div className="container spread">
+      <footer className="site-foot">
+        <div className="container">
           <span>
-            Dados públicos do{" "}
-            <a className="link" href="https://pncp.gov.br" target="_blank" rel="noreferrer">
-              Portal Nacional de Contratações Públicas
+            Radar de Licitações · dados públicos do{" "}
+            <a href="https://pncp.gov.br" target="_blank" rel="noreferrer">
+              PNCP
             </a>
-            . Sem vínculo com o governo; confira sempre o edital original.
+            , sem vínculo com o governo
           </span>
-          <a className="link" href="https://github.com/giovaniohira/radar-licitacoes" target="_blank" rel="noreferrer">
-            Código no GitHub
-          </a>
+          <Link href="/privacidade">Privacidade</Link>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
