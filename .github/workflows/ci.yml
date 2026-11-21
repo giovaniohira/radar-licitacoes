@@ -54,14 +54,14 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://apps.giovaniohira.com/radar
+      url: https://vencedital.com.br
     permissions:
       contents: read
       packages: write
     env:
       REGISTRY: ghcr.io/giovaniohira
       TAG: ${{ inputs.tag || github.sha }}
-      PUBLIC_URL: https://apps.giovaniohira.com/radar
+      PUBLIC_URL: https://vencedital.com.br
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -84,7 +84,7 @@ jobs:
           context: .
           target: web
           build-args: |
-            BASE_PATH=/radar
+            BASE_PATH=
             APP_URL=${{ env.PUBLIC_URL }}
           push: true
           tags: ${{ env.REGISTRY }}/radar-licitacoes-web:${{ env.TAG }},${{ env.REGISTRY }}/radar-licitacoes-web:latest
@@ -120,7 +120,7 @@ jobs:
           $SSH "docker logout ghcr.io >/dev/null; docker image ls --format '{{.Repository}}:{{.Tag}}' | grep '^ghcr.io/giovaniohira/radar-licitacoes-' | grep -v -e ':$TAG\$' -e ':latest\$' | xargs -r docker rmi >/dev/null 2>&1 || true"
           # Smoke test through the container port (nginx is not involved).
           for _ in $(seq 1 20); do
-            if $SSH "curl -fsS -o /dev/null http://127.0.0.1:3200/radar"; then echo "deployed $TAG"; exit 0; fi
+            if $SSH "curl -fsS -o /dev/null http://127.0.0.1:3200/"; then echo "deployed $TAG"; exit 0; fi
             sleep 3
           done
           $SSH "cd /opt/radar && docker compose logs --tail 50 web"
