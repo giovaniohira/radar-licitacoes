@@ -6,6 +6,7 @@ import { dias, hojeBR } from "@/lib/ingest";
 import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
 import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
+import { PRIVADAS, robotsFor } from "@/lib/robots";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
 
 const KEY = "k".repeat(40);
@@ -265,5 +266,19 @@ describe("destacar", () => {
     expect(destacar("Aquisição de Computadores e notebooks", "notebook, computador")).toEqual(["Aquisição de ", "Computador", "es e notebooks"]);
     expect(destacar("Serviço de manutenção", "manutencao -predial")).toEqual(["Serviço de ", "manutenção", ""]);
     expect(destacar("Pneus", "notebook")).toBeNull();
+  });
+});
+
+describe("robots", () => {
+  it("disallows the private routes at a domain root", () => {
+    const r = robotsFor("https://exemplo.com.br");
+    expect(r.sitemap).toBe("https://exemplo.com.br/sitemap.xml");
+    expect(r.rules).toEqual({ userAgent: "*", allow: "/", disallow: PRIVADAS });
+  });
+
+  it("prefixes every path under a sub-path deploy", () => {
+    const r = robotsFor("https://apps.giovaniohira.com/radar/");
+    expect(r.sitemap).toBe("https://apps.giovaniohira.com/radar/sitemap.xml");
+    expect(r.rules).toMatchObject({ allow: "/radar/", disallow: expect.arrayContaining(["/radar/painel", "/radar/entrar/confirmar"]) });
   });
 });
