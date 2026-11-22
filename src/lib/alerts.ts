@@ -4,6 +4,7 @@ import { escapeHtml, sendMail, type Mail } from "./mail";
 import { EMPRESA } from "./empresa";
 import { formatBRL, formatData, frase, local, nome, prazo } from "./format";
 import type { EditalRow } from "./pncp";
+import { htmlDaSecao, marcarEnviadas, recomprasDoUsuario, textoDaSecao, vazio, type Recompras } from "./recompra";
 import { blocoDoResumo, escolherParaResumo, resumoParaEmail, resumosDoCache, tetoDiario } from "./resumo-email";
 import { buildSearch, type EditalResumo } from "./search";
 import type { Resumo } from "./summary";
@@ -83,6 +84,7 @@ export function renderDigest(
   now = new Date(),
   resumos: Map<string, Resumo> = new Map(),
   avisos: AvisoCertidao[] = [],
+  recompras: Recompras | null = null,
 ): Omit<Mail, "to"> {
   const total = grupos.reduce((n, g) => n + g.editais.length, 0);
   const subject = `${total} ${total === 1 ? "novo edital" : "novos editais"} para você`;
@@ -131,6 +133,7 @@ export function renderDigest(
           })
           .join("\n\n"),
     ),
+    ...(vazio(recompras) ? [] : [textoDaSecao(appUrl, recompras!)]),
     `\nGerenciar alertas: ${appUrl}/alertas`,
     `\n${AVISO_DIGEST}`,
   ].join("\n");
@@ -174,7 +177,7 @@ ${blocoDeAvisos(avisos).replaceAll("__APP__", appUrl)}${grupos
 </td></tr>`,
   )
   .join("")}
-<tr><td style="padding:20px 24px">
+${vazio(recompras) ? "" : htmlDaSecao(appUrl, recompras!, C)}<tr><td style="padding:20px 24px">
 <a href="${appUrl}/pipeline" style="display:inline-block;background:${C.accent};color:#fff;font-weight:600;font-size:14px;padding:10px 16px;border-radius:6px;text-decoration:none">Abrir Minhas disputas</a>
 </td></tr>
 </table>
@@ -186,7 +189,10 @@ ${blocoDeAvisos(avisos).replaceAll("__APP__", appUrl)}${grupos
 
 export interface DigestDoUsuario {
   email: string;
+  userId: number;
   grupos: Grupos;
+  /** All the user's active alerts, also the ones with no new edital today (they still feed the recompra section). */
+  alerts: Alert[];
 }
 
 /** Who gets an e-mail now and what is in it: the open, not-yet-sent editais of each user's active alerts. */
@@ -206,7 +212,7 @@ export async function montarDigests(db: Pool): Promise<DigestDoUsuario[]> {
       const editais = await matchesForAlert(db, alert);
       if (editais.length) grupos.push({ alert, editais });
     }
-    if (grupos.length) digests.push({ email, grupos });
+    if (grupos.length) digests.push({ email, userId: userAlerts[0].user_id, grupos, alerts: userAlerts });
   }
   return digests;
 }
@@ -240,6 +246,26 @@ export async function prepararResumosDoDigest(
 }
 
 /**
+ * The "contracts ending soon" section of one user's digest. It can only add to the e-mail: a slow query (cut at 20 s) or
+ * an error means the e-mail goes out without the section, and the contracts stay unsent for the next day.
+ */
+async function recomprasDoDigest(db: Pool, userId: number, alerts: Alert[], hoje: string, log: (m: string) => void): Promise<Recompras | null> {
+  const client = await db.connect();
+  try {
+    await client.query("set statement_timeout = 20000");
+    const { rows } = await client.query<{ cnpj: string | null }>(`select cnpj from users where id = $1`, [userId]);
+    const r = await recomprasDoUsuario(client, userId, alerts, hoje, { cnpj: rows[0]?.cnpj ?? null });
+    return vazio(r) ? null : r;
+  } catch (e) {
+    log(`recompra: sem a seção para o usuário ${userId} (${e instanceof Error ? e.message : e})`);
+    return null;
+  } finally {
+    await client.query("reset statement_timeout").catch(() => {});
+    client.release();
+  }
+}
+
+/**
  * The short e-mail for a user who has a certificate to warn about but no new edital today. Same footer rules as the
  * digest: plain tables, inline styles, a text version.
  */
@@ -270,12 +296,13 @@ export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => 
   const hoje = hojeDasCertidoes();
   const pendentes = new Map((await avisosPendentes(db, hoje)).map((a) => [a.email, a.certidoes]));
   let enviados = 0;
-  for (const { email, grupos } of await montarDigests(db)) {
+  for (const { email, userId, grupos, alerts } of await montarDigests(db)) {
     const certidoes = pendentes.get(email) ?? [];
     pendentes.delete(email);
     const ids = escolherParaResumo(grupos.flatMap((g) => g.editais)).map((e) => e.id);
     const resumos = await resumosDoCache(db, ids);
-    await sendMail({ to: email, ...renderDigest(appUrl, grupos, new Date(), resumos, avisosDasCertidoes(certidoes, hoje)) });
+    const recompras = await recomprasDoDigest(db, userId, alerts, hoje, log);
+    await sendMail({ to: email, ...renderDigest(appUrl, grupos, new Date(), resumos, avisosDasCertidoes(certidoes, hoje), recompras) });
     // Recorded only after the send succeeds, so a failed SMTP call retries the same editais next run.
     for (const g of grupos) {
       await db.query(
@@ -284,6 +311,7 @@ export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => 
       );
     }
     await marcarAvisadas(db, certidoes.map((c) => c.id), hoje);
+    if (recompras) await marcarEnviadas(db, userId, recompras);
     enviados++;
     log(`${email}: ${grupos.reduce((n, g) => n + g.editais.length, 0)} editais`);
   }

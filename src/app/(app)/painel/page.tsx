@@ -8,6 +8,7 @@ import { ROTULO_DO_SELO, estadoDaCertidao, hojeBR, listarCertidoes, nomeDaCertid
 import { pool, query } from "@/lib/db";
 import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazoTom, tituloCurto } from "@/lib/format";
 import { first } from "@/lib/params";
+import { partesDoItem, recomprasEnviadas, type Contrato } from "@/lib/recompra";
 import { ETAPAS, etapaLabel, listPipeline, vencendo, type Etapa, type PipelineItem } from "@/lib/pipeline";
 import { buildSearch, type EditalResumo } from "@/lib/search";
 import { resumoConfigurado } from "@/lib/summary-tipos";
@@ -229,16 +230,43 @@ function CertidoesCard({ certidoes, itens }: { certidoes: Certidao[]; itens: Pip
   );
 }
 
+/** The contracts the last 30 days of e-mails told about whose end date has not come yet. Hidden when there are none. */
+function RecomprasCard({ contratos }: { contratos: Contrato[] }) {
+  if (!contratos.length) return null;
+  return (
+    <section className="card card-pad stack" style={{ gap: 10 }} aria-label="Recompras à vista">
+      <div className="card-title">
+        <h2>Recompras à vista</h2>
+      </div>
+      <ul className="recompra-lista">
+        {contratos.map((c) => {
+          const p = partesDoItem(c);
+          return (
+            <li key={c.id}>
+              <Link href={`/orgao/${c.orgao_cnpj}`} className="t">
+                {p.objeto}
+              </Link>
+              <span className="xs muted">{p.comprador}</span>
+              <span className="xs">{p.detalhe}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchParams">) {
   await connection();
   const user = await requireUser();
   const sp = await searchParams;
   const aba = first(sp.alerta);
-  const [itens, alerts, [{ resumiu }], certidoes] = await Promise.all([
+  const [itens, alerts, [{ resumiu }], certidoes, recompras] = await Promise.all([
     listPipeline(pool(), user.id),
     query<AlertRow>(`select id, nome, palavras, ufs, modalidades, valor_min, valor_max from alerts where user_id = $1 and ativo order by id`, [user.id]),
     query<{ resumiu: boolean }>(`select exists (select 1 from pipeline p join resumos r using (edital_id) where p.user_id = $1) as resumiu`, [user.id]),
     listarCertidoes(pool(), user.id),
+    recomprasEnviadas(pool(), user.id, hojeBR()),
   ]);
 
   // New matches per alert in the last 24h, same query the daily digest uses.
@@ -362,6 +390,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
           <Semana itens={itens} />
           <EmDisputa itens={itens} />
           <CertidoesCard certidoes={certidoes} itens={itens} />
+          <RecomprasCard contratos={recompras} />
         </aside>
       </div>
     </div>
