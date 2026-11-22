@@ -4,17 +4,20 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { HBars, ListaRanking, iniciais } from "@/components/charts";
+import { JsonLd } from "@/components/JsonLd";
 import { Kpi, Loading } from "@/components/ui";
 import { pool } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, nome } from "@/lib/format";
 import { analisar, fornecedorInfo } from "@/lib/mercado";
+import { siteUrl, trilha } from "@/lib/schema";
 
 const getFornecedor = cache((ni: string) => fornecedorInfo(pool(), ni));
 
 export async function generateMetadata({ params }: PageProps<"/fornecedor/[ni]">): Promise<Metadata> {
   const ni = (await params).ni.replace(/\D/g, "");
   const info = ni.length === 14 ? await getFornecedor(ni) : null;
-  if (!info) return { title: "Fornecedor não encontrado" };
+  // A real 404 for crawlers that get the metadata before the body (see htmlLimitedBots); the page body keeps its own notFound().
+  if (!info) notFound();
   const title = nome(info.nome);
   const description = `Contratos com o governo, principais órgãos clientes e o que ${title} (CNPJ ${formatCNPJ(ni)}) vende, com dados do PNCP.`;
   return { title, description, alternates: { canonical: `/fornecedor/${ni}` }, openGraph: { title, description } };
@@ -31,6 +34,7 @@ async function Fornecedor({ params }: PageProps<"/fornecedor/[ni]">) {
 
   return (
     <div className="page" style={{ gap: 20 }}>
+      <JsonLd data={trilha(siteUrl(), [{ nome: "Mercado", path: "/mercado" }, { nome: nome(info.nome), path: `/fornecedor/${ni}` }])} />
       <nav className="crumbs" aria-label="Você está em">
         <Link href="/mercado">Mercado</Link>
         <span>/</span>
