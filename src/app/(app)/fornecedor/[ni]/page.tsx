@@ -4,10 +4,12 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { HBars, ListaRanking, iniciais } from "@/components/charts";
+import { JsonLd } from "@/components/JsonLd";
 import { Kpi, Loading } from "@/components/ui";
 import { pool } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, nome } from "@/lib/format";
 import { analisar, fornecedorInfo } from "@/lib/mercado";
+import { siteUrl, trilha } from "@/lib/schema";
 
 const getFornecedor = cache((ni: string) => fornecedorInfo(pool(), ni));
 
@@ -32,6 +34,7 @@ async function Fornecedor({ params }: PageProps<"/fornecedor/[ni]">) {
 
   return (
     <div className="page" style={{ gap: 20 }}>
+      <JsonLd data={trilha(siteUrl(), [{ nome: "Mercado", path: "/mercado" }, { nome: nome(info.nome), path: `/fornecedor/${ni}` }])} />
       <nav className="crumbs" aria-label="Você está em">
         <Link href="/mercado">Mercado</Link>
         <span>/</span>

@@ -10,6 +10,7 @@ import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
 import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
 import { minimoDePalavras, prefiltroGin, termosDoObjeto } from "@/lib/quemganhou";
+import { aplicativo, faq, landing, organizacao, serializar, trilha } from "@/lib/schema";
 import { FILTRADAS, PRIVADAS, ROBOS_IA_BUSCA, ROBOS_IA_TREINO, robotsFor } from "@/lib/robots";
 import nextConfig from "../next.config";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
@@ -316,6 +317,39 @@ describe("htmlLimitedBots", () => {
   it("keeps the crawlers Next already covered, and leaves people alone", () => {
     for (const ua of ["Bingbot/2.0", "facebookexternalhit/1.1", "Twitterbot/1.0", "WhatsApp/2", "LinkedInBot/1.0"]) expect(re.test(ua), ua).toBe(true);
     expect(re.test("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120 Safari/537.36")).toBe(false);
+  });
+});
+
+describe("schema.org", () => {
+  const base = "https://exemplo.com.br";
+  const perguntas = [{ q: "Quanto custa?", a: "R$ 97 por mês." }, { q: "Preciso de senha?", a: "Não <b>precisa</b>." }];
+
+  it("states the real price and the company, and never a rating or a review", () => {
+    const g = landing(base, perguntas);
+    const txt = JSON.stringify(g);
+    expect(txt).not.toMatch(/aggregateRating|ratingValue|"review"|reviewCount/i);
+    const app = aplicativo(base) as { offers: { price: string; priceCurrency: string; priceSpecification: { billingDuration: string } } };
+    expect(app.offers).toMatchObject({ price: "97.00", priceCurrency: "BRL", priceSpecification: { billingDuration: "P1M" } });
+    expect(organizacao(base)).toMatchObject({ name: "Vencedital", legalName: expect.stringMatching(/^OHIRA TECNOLOGIA LTDA/) });
+    expect(g["@graph"]).toHaveLength(4);
+  });
+
+  it("mirrors the FAQ question for question", () => {
+    const f = faq(base, perguntas) as { mainEntity: { name: string; acceptedAnswer: { text: string } }[] };
+    expect(f.mainEntity.map((m) => [m.name, m.acceptedAnswer.text])).toEqual(perguntas.map((p) => [p.q, p.a]));
+  });
+
+  it("numbers the breadcrumb from 1 with absolute URLs", () => {
+    const t = trilha(base, [{ nome: "Mercado", path: "/mercado" }, { nome: "Município X", path: "/orgao/123" }]) as { itemListElement: { position: number; item: string }[] };
+    expect(t.itemListElement).toEqual([
+      expect.objectContaining({ position: 1, item: `${base}/mercado` }),
+      expect.objectContaining({ position: 2, item: `${base}/orgao/123` }),
+    ]);
+  });
+
+  it("cannot close the script tag from inside a string", () => {
+    expect(serializar({ nome: "</script><script>alert(1)</script>" })).not.toContain("<");
+    expect(JSON.parse(serializar({ nome: "a<b" }))).toEqual({ nome: "a<b" });
   });
 });
 
