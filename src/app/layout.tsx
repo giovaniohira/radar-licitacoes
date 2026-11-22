@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const sans = Inter({ variable: "--font-sans", subsets: ["latin"] });
-// Headings and the "vencedital" wordmark.
+// UI and body text.
+const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });
+// Small uppercase labels, indexes and keyboard hints.
+const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
+// Editorial headings and big numbers; opsz keeps it delicate at display sizes and sturdy at 30px.
+const serif = Newsreader({ variable: "--font-serif", subsets: ["latin"], style: ["normal", "italic"], axes: ["opsz"] });
+// The "vencedital" wordmark only.
 const display = Space_Grotesk({ variable: "--font-display", subsets: ["latin"] });
 
 const title = "Vencedital — alerta diário de licitações do PNCP, com o edital lido por IA";
@@ -21,7 +26,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={`${sans.variable} ${display.variable}`}>
+    <html lang="pt-BR" className={`${sans.variable} ${mono.variable} ${serif.variable} ${display.variable}`}>
       <body>
         <a className="skip" href="#conteudo">
           Pular para o conteúdo

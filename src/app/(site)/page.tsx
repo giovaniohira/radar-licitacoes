@@ -1,9 +1,10 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { connection } from "next/server";
-import { Icon } from "@/components/icons";
+import { Icon, Mark } from "@/components/icons";
 import { editalHref, type EditalLinha } from "@/components/ui";
 import { MAX_ALERTAS } from "@/lib/alerts";
 import { query } from "@/lib/db";
@@ -11,6 +12,7 @@ import { DIAS_TESTE, EMPRESA, PRECO_MENSAL } from "@/lib/empresa";
 import { formatBRLCompact, formatDia, formatInt, frase, nome, tituloCurto } from "@/lib/format";
 import { LIMITE_DIARIO } from "@/lib/summary";
 import { LoginForm } from "../entrar/LoginForm";
+import produtoBusca from "./produto-busca.webp";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
@@ -63,12 +65,18 @@ const FAQ = [
   },
 ];
 
-// Illustration of the Hoje screen in the hero; the real one is built from the user's data.
-const MOCK = [
-  { n: 1, t: "Juntar 3 documentos dos gêneros alimentícios", s: "prazo quarta, 10h", urg: true },
-  { n: 2, t: "Revisar os editais novos do seu ramo", s: "chegaram desde ontem" },
-  { n: 3, t: "Decidir sobre o hortifruti", s: "o resumo da IA já está pronto" },
+// Callouts over the real search screenshot in the hero. Boxes are % of the image, measured on the
+// 1280×841 capture (docs/visual-revamp/README.md says how to retake it): alvo = x, y, w, h of the
+// highlighted control; bolha = where the bubble sits, anchored by its right edge on the right side so it
+// never runs off narrower screens.
+const DESTAQUES: { t: string; d: string; alvo: [number, number, number, number]; bolha: { left?: number; right?: number; top: number } }[] = [
+  { t: "Diga o que você vende", d: "A busca já vem com as palavras que os órgãos usam.", alvo: [66, 25, 7, 3.4], bolha: { left: 69, top: 6 } },
+  { t: "Receba só o que é novo", d: "Salve a busca e os editais novos chegam às 7h.", alvo: [84.6, 53.3, 11.1, 4.3], bolha: { right: 4, top: 39 } },
+  { t: "Marque o que interessa", d: "O edital vai para Minhas disputas, com checklist.", alvo: [78, 70.6, 8.9, 3.8], bolha: { right: -2, top: 80 } },
+  { t: "Não perca nenhum prazo", d: "O prazo da proposta em cada edital.", alvo: [68.2, 87, 5.2, 2.4], bolha: { left: 44, top: 92 } },
 ];
+
+const pct = (n: number) => `${n}%`;
 
 // The landing's numbers are cached for an hour: they barely move between ingests, and computing them
 // on every visit made the first request after idle slow.
@@ -129,200 +137,286 @@ async function Previa() {
   ));
 }
 
+const seta = <Icon name="arrowRight" size={15} className="arr" />;
+
+/** Section label: "01 — Como funciona". */
+function Kicker({ n, children }: { n: string; children: ReactNode }) {
+  return (
+    <p className="kicker">
+      <span className="idx">{n}</span>
+      {children}
+    </p>
+  );
+}
+
 export default function Home() {
   return (
     <main id="conteudo">
-      <section className="container hero">
-        <div className="hero-copy">
-          <h1>Os editais do seu ramo chegam às 7h. Já lidos.</h1>
-          <p className="lead">
-            Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
-            prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
-          </p>
-          <LoginForm variante="hero" />
-          <p className="small subtle">{DIAS_TESTE} dias grátis. Sem senha e sem cartão: você entra pelo link que chega no e-mail.</p>
-          <Link href="/buscar" className="small" style={{ fontWeight: 600 }}>
-            Ver licitações abertas agora, sem cadastro →
-          </Link>
-        </div>
+      {/* Ink block: promise, sign-up, product preview and today's live PNCP numbers. */}
+      <section className="hero on-ink">
+        <div className="container">
+          <p className="kicker rise">Alerta diário de licitações do PNCP</p>
+          <h1 className="display hero-h rise d1">
+            Os editais do seu ramo chegam às 7h. <em>Já lidos.</em>
+          </h1>
 
-        <div className="hero-mock" aria-hidden>
-          <div className="xs subtle">Hoje</div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 650, letterSpacing: "-0.02em" }}>Bom dia. Você tem 3 coisas pra hoje.</div>
-          <div className="card" style={{ overflow: "hidden" }}>
-            {MOCK.map((t) => (
-              <div key={t.n} className={`task${t.urg ? " urg" : ""}`}>
-                <span className="n">{t.n}</span>
-                <div className="body" style={{ flexBasis: 0, flexGrow: 1 }}>
-                  <div className="t">{t.t}</div>
-                  <p>{t.s}</p>
-                </div>
+          <div className="hero-intro rise d2">
+            <p className="lead">
+              Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
+              prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
+            </p>
+            <div className="hero-cta">
+              <LoginForm variante="hero" />
+              <p className="hero-nota">{DIAS_TESTE} dias grátis. Sem senha e sem cartão: você entra pelo link que chega no e-mail.</p>
+              <Link href="/buscar" className="link-arr">
+                Ver licitações abertas agora, sem cadastro {seta}
+              </Link>
+            </div>
+          </div>
+
+          {/* A real screen, not an illustration, with what matters called out on top of it. */}
+          <figure className="hero-shot rise d3">
+            <div className="shot">
+              <div className="shot-img">
+                <Image
+                  src={produtoBusca}
+                  alt="Tela Encontrar editais do Vencedital: busca de alimentação escolar com editais abertos no PNCP, valor, prazo e o botão Tenho interesse"
+                  sizes="(max-width: 1240px) 100vw, 1160px"
+                  loading="eager"
+                  fetchPriority="high"
+                  unoptimized
+                />
+                {DESTAQUES.map((d, i) => (
+                  <span
+                    key={d.t}
+                    className="alvo"
+                    data-n={`0${i + 1}`}
+                    aria-hidden
+                    style={{ left: pct(d.alvo[0]), top: pct(d.alvo[1]), width: pct(d.alvo[2]), height: pct(d.alvo[3]), animationDelay: `${0.7 + i * 0.15}s` }}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="card card-pad stack" style={{ gap: 6 }}>
-            <div className="row" style={{ gap: 6, fontSize: 12, fontWeight: 600, color: "var(--brand-text)" }}>
-              <Icon name="sparkle" size={14} /> Resumo por IA
+              <ol className="bolhas">
+                {DESTAQUES.map((d, i) => (
+                  <li key={d.t} className="bolha" style={{
+                      top: pct(d.bolha.top),
+                      ...(d.bolha.right != null ? { right: pct(d.bolha.right) } : { left: pct(d.bolha.left ?? 0) }),
+                      animationDelay: `${0.8 + i * 0.15}s`,
+                    }}>
+                    <i aria-hidden>0{i + 1}</i>
+                    <span>
+                      <b>{d.t}</b>
+                      {d.d}
+                    </span>
+                  </li>
+                ))}
+              </ol>
             </div>
-            <div className="small" style={{ fontWeight: 600 }}>
-              Tem alguma pegadinha?
+            <figcaption>Tela real do Vencedital, com editais publicados no PNCP.</figcaption>
+          </figure>
+
+          <div id="hoje" className="cobertura" role="region" aria-labelledby="hoje-h">
+            <div className="cob-head">
+              <h2 id="hoje-h" className="kicker vivo">
+                Cobertura do PNCP hoje
+              </h2>
+              <span>Lido três vezes por dia, de órgãos municipais, estaduais e federais.</span>
             </div>
-            <div className="small muted">Amostra do produto em até 3 dias úteis após a convocação.</div>
+            <div className="numeros">
+              <Suspense fallback={<div className="numeros-sk" />}>
+                <Numeros />
+              </Suspense>
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="hoje" className="band" aria-label="Cobertura do PNCP hoje">
+      <section id="como" className="sec" aria-labelledby="como-h">
         <div className="container">
-          <div className="spread">
-            <h2>Cobertura do PNCP hoje</h2>
-            <span className="small subtle">Lido três vezes por dia, de órgãos municipais, estaduais e federais.</span>
+          <div className="sec-head">
+            <Kicker n="01">Como funciona</Kicker>
+            <h2 id="como-h" className="display sec-h">
+              Do cadastro ao primeiro e-mail em três passos
+            </h2>
           </div>
-          <div className="numeros">
-            <Suspense fallback={<div style={{ height: 88 }} />}>
-              <Numeros />
-            </Suspense>
-          </div>
-        </div>
-      </section>
-
-      <section className="container landing-sec">
-        <h2 className="big-h">Do edital publicado à proposta enviada, sem planilha.</h2>
-        <div className="recursos">
-          {RECURSOS.map((r) => (
-            <article key={r.t}>
-              <h3>{r.t}</h3>
-              <p>{r.d}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="container landing-sec" aria-labelledby="ia-h">
-        <div className="stack" style={{ gap: 10 }}>
-          <h2 id="ia-h" className="big-h">
-            A IA lê o edital. Você lê o resumo.
-          </h2>
-          <p className="muted" style={{ fontSize: 17 }}>
-            Ela abre o PDF e devolve só o que decide se você entra:
-          </p>
-        </div>
-        <dl className="ia-lista">
-          {IA.map((i) => (
-            <div key={i.t}>
-              <dt>{i.t}</dt>
-              <dd>{i.d}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="small muted">O resumo ajuda a decidir rápido. Ele não substitui o edital, e o link do original está sempre ao lado.</p>
-      </section>
-
-      <section id="como" className="band como">
-        <div className="container">
-          <div className="como-passos">
-            <h2>Do cadastro ao primeiro e-mail em três passos</h2>
-            {PASSOS.map((p, i) => (
-              <div key={p.t} className="p">
-                <span className="n">{i + 1}</span>
+          <div className="como-grid">
+            <ol className="passos">
+              {PASSOS.map((p, i) => (
+                <li key={p.t} className="reveal">
+                  <span className="n">0{i + 1}</span>
+                  <div>
+                    <h3>{p.t}</h3>
+                    <p>{p.d}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <div id="email" className="email-previa reveal">
+              <div className="h">
+                <span className="av" aria-hidden>
+                  <Mark size={14} />
+                </span>
                 <div>
-                  <h3>{p.t}</h3>
-                  <p>{p.d}</p>
+                  <strong>Vencedital · hoje, 07:00</strong>
+                  <div>Editais novos para o seu ramo</div>
                 </div>
               </div>
-            ))}
-          </div>
-          <div id="email" className="email-previa">
-            <div className="h">
-              <div>
-                <strong>Vencedital · hoje, 07:00</strong>
-              </div>
-              <div>Editais novos para o seu ramo</div>
+              <Suspense fallback={<div style={{ height: 210 }} />}>
+                <Previa />
+              </Suspense>
+              <div className="f">Prévia do e-mail diário, com editais reais abertos agora</div>
             </div>
-            <Suspense fallback={<div style={{ height: 210 }} />}>
-              <Previa />
-            </Suspense>
-            <div className="f">Prévia do e-mail diário, com editais reais abertos agora</div>
           </div>
         </div>
       </section>
 
-      <section className="container landing-sec" aria-labelledby="mercado-h">
-        <h2 id="mercado-h" className="big-h">
-          Antes de dar o preço, veja quem já ganhou
-        </h2>
-        <p className="muted" style={{ fontSize: 17, maxWidth: 640 }}>
-          Cada órgão e cada fornecedor do PNCP tem uma página: o que comprou, de quem, em que faixa de valor e com que frequência.
-        </p>
-        <Link className="btn" href="/mercado" style={{ width: "fit-content" }}>
-          Explorar o mercado →
-        </Link>
+      <section className="sec on-ink" aria-labelledby="ia-h">
+        <div className="container">
+          <div className="sec-head split">
+            <div>
+              <Kicker n="02">Resumo por IA</Kicker>
+              <h2 id="ia-h" className="display sec-h">
+                A IA lê o edital. <em>Você lê o resumo.</em>
+              </h2>
+            </div>
+            <p className="sec-sub">Ela abre o PDF e devolve só o que decide se você entra:</p>
+          </div>
+          <dl className="ia-grid">
+            {IA.map((i) => (
+              <div key={i.t} className="reveal">
+                <dt>{i.t}</dt>
+                <dd>{i.d}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="sec-foot">O resumo ajuda a decidir rápido. Ele não substitui o edital, e o link do original está sempre ao lado.</p>
+        </div>
       </section>
 
-      <section id="precos" className="band" aria-labelledby="precos-h">
+      <section className="sec sec-white" aria-labelledby="rec-h">
         <div className="container">
-          <h2 id="precos-h" className="big-h">
-            Preço na tela, sem falar com vendedor
-          </h2>
+          <div className="sec-head">
+            <Kicker n="03">Recursos</Kicker>
+            <h2 id="rec-h" className="display sec-h">
+              Do edital publicado à proposta enviada, sem planilha.
+            </h2>
+          </div>
+          <div className="recursos">
+            {RECURSOS.map((r, i) => (
+              <article key={r.t} className="reveal">
+                <span className="n">0{i + 1}</span>
+                <h3>{r.t}</h3>
+                <p>{r.d}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="sec sec-sand" aria-labelledby="mercado-h">
+        <div className="container mercado">
+          <div>
+            <Kicker n="04">Mercado</Kicker>
+            <h2 id="mercado-h" className="display sec-h">
+              Antes de dar o preço, veja quem já ganhou
+            </h2>
+          </div>
+          <div className="mercado-body">
+            <p>Cada órgão e cada fornecedor do PNCP tem uma página: o que comprou, de quem, em que faixa de valor e com que frequência.</p>
+            <Link className="link-arr" href="/mercado">
+              Explorar o mercado {seta}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="precos" className="sec" aria-labelledby="precos-h">
+        <div className="container">
+          <div className="sec-head">
+            <Kicker n="05">Preços</Kicker>
+            <h2 id="precos-h" className="display sec-h">
+              Preço na tela, sem falar com vendedor
+            </h2>
+          </div>
           <div className="precos">
-            <article className="card card-pad stack">
+            <article className="plano">
               <h3>Grátis, sem cadastro</h3>
-              <p className="muted">Busca de licitações, página de cada edital e Mercado.</p>
-              <Link className="btn" href="/buscar" style={{ width: "fit-content" }}>
-                Ver licitações abertas
+              <p className="preco">
+                <b className="num">R$ 0</b>
+              </p>
+              <p className="desc">Busca de licitações, página de cada edital e Mercado.</p>
+              <Link className="btn btn-lg" href="/buscar">
+                Ver licitações abertas {seta}
               </Link>
             </article>
-            <article className="card card-pad stack destaque">
-              <h3>Vencedital</h3>
+            <article className="plano destaque on-ink">
+              <div className="plano-top">
+                <h3>Vencedital</h3>
+                <span className="selo">Preço de fundador</span>
+              </div>
               <p className="preco">
                 <b className="num">R$ {PRECO_MENSAL}</b>
                 <span>/mês</span>
               </p>
-              <p className="muted">
-                Até {MAX_ALERTAS} alertas diários, {LIMITE_DIARIO} resumos por IA por dia, Minhas disputas com checklist e prazos na sua agenda.
-              </p>
-              <p className="small">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa. Nota fiscal todo mês.</p>
-              <Link className="btn btn-primary" href="/entrar" style={{ width: "fit-content" }}>
-                Começar teste grátis
+              <ul className="inclui">
+                <li>Até {MAX_ALERTAS} alertas diários</li>
+                <li>{LIMITE_DIARIO} resumos por IA por dia</li>
+                <li>Minhas disputas com checklist</li>
+                <li>Prazos na sua agenda</li>
+              </ul>
+              <p className="desc">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa. Nota fiscal todo mês.</p>
+              <Link className="btn btn-light btn-lg" href="/entrar">
+                Começar teste grátis {seta}
               </Link>
             </article>
           </div>
-          <p className="small">
+          <p className="fundador">
             <b>Preço de fundador:</b> as 10 primeiras empresas pagam R$ {PRECO_MENSAL}/mês sem reajuste, enquanto a assinatura estiver ativa. Se desistir
             em até 7 dias do primeiro pagamento, devolvemos tudo. Ao assinar, você aceita os <Link href="/termos">Termos de Uso</Link>.
           </p>
         </div>
       </section>
 
-      <section className="container landing-sec" aria-labelledby="faq-h">
-        <h2 id="faq-h" className="big-h">
-          Perguntas frequentes
-        </h2>
-        <div className="faq">
-          {FAQ.map((f) => (
-            <details key={f.q}>
-              <summary>{f.q}</summary>
-              <p>{f.a}</p>
-            </details>
-          ))}
+      <section className="sec sec-white" aria-labelledby="faq-h">
+        <div className="container faq-grid">
+          <div className="faq-side">
+            <Kicker n="06">Dúvidas</Kicker>
+            <h2 id="faq-h" className="display sec-h">
+              Perguntas frequentes
+            </h2>
+          </div>
+          <div className="faq">
+            {FAQ.map((f) => (
+              <details key={f.q}>
+                <summary>{f.q}</summary>
+                <p>{f.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="container cta-final">
-        <p className="small muted" style={{ maxWidth: 640 }}>
-          Feito por Giovani Ohira, da {EMPRESA.razaoSocial}, porque achar licitação hoje é uma planilha e muita paciência.
-          {EMPRESA.contato && (
-            <>
-              {" "}
-              Se o resumo errar ou faltar algo, escreva para <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>: quem responde sou eu.
-            </>
-          )}
-        </p>
-        <h2>Amanhã às 7h, os editais do seu ramo no seu e-mail.</h2>
-        <p>Entre só com seu e-mail, diga o que você vende e pronto.</p>
-        <Link className="btn btn-primary" href="/entrar">
-          Começar teste grátis
-        </Link>
+      <section className="cta-final on-ink">
+        <div className="container">
+          <h2 className="display">
+            Amanhã às 7h, os editais do seu ramo <em>no seu e-mail.</em>
+          </h2>
+          <div className="cta-row">
+            <p>Entre só com seu e-mail, diga o que você vende e pronto.</p>
+            <Link className="btn btn-light btn-lg" href="/entrar">
+              Começar teste grátis {seta}
+            </Link>
+          </div>
+          <p className="assinatura">
+            Feito por Giovani Ohira, da {EMPRESA.razaoSocial}, porque achar licitação hoje é uma planilha e muita paciência.
+            {EMPRESA.contato && (
+              <>
+                {" "}
+                Se o resumo errar ou faltar algo, escreva para <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>: quem responde sou eu.
+              </>
+            )}
+          </p>
+        </div>
       </section>
     </main>
   );
