@@ -29,6 +29,7 @@ import { minimoDePalavras, prefiltroGin, termosDoObjeto } from "@/lib/quemganhou
 import { aplicativo, faq, landing, organizacao, serializar, trilha } from "@/lib/schema";
 import { FILTRADAS, PRIVADAS, ROBOS_IA_BUSCA, ROBOS_IA_TREINO, robotsFor } from "@/lib/robots";
 import nextConfig from "../next.config";
+import { tituloEdital } from "@/lib/seo";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
 
 const KEY = "k".repeat(40);
@@ -415,6 +416,13 @@ describe("schema.org", () => {
   it("cannot close the script tag from inside a string", () => {
     expect(serializar({ nome: "</script><script>alert(1)</script>" })).not.toContain("<");
     expect(JSON.parse(serializar({ nome: "a<b" }))).toEqual({ nome: "a<b" });
+  });
+});
+
+describe("edital title", () => {
+  it("drops a stray leading dash and keeps the title short", () => {
+    expect(tituloEdital("- Contratação de empresa para readequação de rede", 60)).not.toMatch(/^-/);
+    expect(tituloEdital("Aquisição de pneus ".repeat(10), 60).length).toBeLessThanOrEqual(61);
   });
 });
 
