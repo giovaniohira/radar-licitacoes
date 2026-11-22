@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { avisosPendentes, certidoesParaAvisar, hojeBR as hojeDasCertidoes, linkDaCertidao, marcarAvisadas, textoDoAviso, type Certidao } from "./certidoes";
 import { escapeHtml, sendMail, type Mail } from "./mail";
 import { EMPRESA } from "./empresa";
 import { formatBRL, formatData, frase, local, nome, prazo } from "./format";
@@ -55,7 +56,34 @@ const C = { text: "#18181b", muted: "#5f5f6b", border: "#e6e6e9", accent: "#1e29
 /** One e-mail's alert groups. */
 type Grupos = { alert: Alert; editais: EditalResumo[] }[];
 
-export function renderDigest(appUrl: string, grupos: Grupos, now = new Date(), resumos: Map<string, Resumo> = new Map()): Omit<Mail, "to"> {
+/** A line at the top of an e-mail: "Sua CRF do FGTS vence em 3 dias." and where to renew it, when we know. */
+export interface AvisoCertidao {
+  texto: string;
+  link: string | null;
+}
+
+export const avisosDasCertidoes = (cs: Certidao[], hoje: string): AvisoCertidao[] =>
+  certidoesParaAvisar(cs, hoje).map((c) => ({ texto: textoDoAviso(c, hoje), link: linkDaCertidao(c) }));
+
+const linhaDeAviso = (a: AvisoCertidao) => `<div style="margin-top:6px"><b>${escapeHtml(a.texto)}</b>${a.link ? ` <a href="${escapeHtml(a.link)}" style="color:${C.accent};font-weight:600">Emitir →</a>` : ""}</div>`;
+
+/** The top-of-e-mail block, or "" when there is nothing to warn about. */
+const blocoDeAvisos = (avisos: AvisoCertidao[]) =>
+  avisos.length
+    ? `<tr><td style="padding:14px 24px;background:#fff7ed;border-bottom:1px solid ${C.border};font-size:13px;line-height:19px;color:${C.text}">
+<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.warn}">Certidões</div>${avisos.map(linhaDeAviso).join("")}
+<div style="margin-top:6px"><a href="__APP__/certidoes" style="color:${C.muted}">Ver minhas certidões</a></div>
+</td></tr>`
+    : "";
+
+
+export function renderDigest(
+  appUrl: string,
+  grupos: Grupos,
+  now = new Date(),
+  resumos: Map<string, Resumo> = new Map(),
+  avisos: AvisoCertidao[] = [],
+): Omit<Mail, "to"> {
   const total = grupos.reduce((n, g) => n + g.editais.length, 0);
   const subject = `${total} ${total === 1 ? "novo edital" : "novos editais"} para você`;
   const link = (e: EditalResumo) => `${appUrl}/edital/${encodeURIComponent(e.id)}`;
@@ -87,6 +115,7 @@ export function renderDigest(appUrl: string, grupos: Grupos, now = new Date(), r
 
   const text = [
     subject,
+    ...(avisos.length ? [`\nCertidões:\n${avisos.map((a) => `- ${a.texto}${a.link ? ` Emitir: ${a.link}` : ""}`).join("\n")}`] : []),
     ...grupos.map(
       (g) =>
         `\n## ${g.alert.nome}\n\n` +
@@ -137,7 +166,7 @@ ${b.atencao.map((a) => `<div style="margin-top:4px;color:${C.warn}"><b>Atenção
 <span style="font-weight:700;color:${C.accent}">Vencedital</span>
 <div style="font-size:20px;font-weight:700;margin-top:8px">${escapeHtml(subject)}</div>
 </td></tr>
-${grupos
+${blocoDeAvisos(avisos).replaceAll("__APP__", appUrl)}${grupos
   .map(
     (g) => `<tr><td style="padding:16px 24px 0">
 <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.muted}">${escapeHtml(g.alert.nome)} · ${g.editais.length}</div>
@@ -210,13 +239,43 @@ export async function prepararResumosDoDigest(
   return { escolhidos: ids.size, resumidos };
 }
 
-/** Sends one digest per user covering all their active alerts. Returns how many e-mails went out. */
+/**
+ * The short e-mail for a user who has a certificate to warn about but no new edital today. Same footer rules as the
+ * digest: plain tables, inline styles, a text version.
+ */
+export function renderAvisoCertidoes(appUrl: string, avisos: AvisoCertidao[]): Omit<Mail, "to"> {
+  const subject = avisos.length === 1 ? avisos[0].texto.replace(/\.$/, "") : `${avisos.length} certidões vencendo`;
+  const text = [subject, "", ...avisos.map((a) => `- ${a.texto}${a.link ? ` Emitir: ${a.link}` : ""}`), "", `Minhas certidões: ${appUrl}/certidoes`].join("\n");
+  const html = `<!doctype html><html><body style="margin:0;background:${C.bg}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${C.text}">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid ${C.border};border-radius:12px">
+<tr><td style="padding:20px 24px">
+<span style="font-weight:700;color:${C.accent}">Vencedital</span>
+<div style="font-size:20px;font-weight:700;margin:8px 0 12px">${escapeHtml(subject)}</div>
+${avisos.map(linhaDeAviso).join("")}
+<div style="margin-top:14px"><a href="${appUrl}/certidoes" style="display:inline-block;background:${C.accent};color:#fff;font-weight:600;font-size:14px;padding:10px 16px;border-radius:6px;text-decoration:none">Ver minhas certidões</a></div>
+</td></tr>
+</table>
+<p style="font-size:12px;color:${C.muted};max-width:600px">Você recebe este aviso porque cadastrou a validade das suas certidões no Vencedital. Confira sempre a data no documento oficial. Vencedital · ${escapeHtml(EMPRESA.razaoSocial)} · sem vínculo com o governo.</p>
+</td></tr></table></body></html>`;
+  return { subject, html, text };
+}
+
+/**
+ * Sends one digest per user covering all their active alerts, with the certificate warnings of the day on top; a user
+ * with a warning and no new edital gets the short e-mail. Returns how many e-mails went out.
+ */
 export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => void = () => {}): Promise<number> {
+  const hoje = hojeDasCertidoes();
+  const pendentes = new Map((await avisosPendentes(db, hoje)).map((a) => [a.email, a.certidoes]));
   let enviados = 0;
   for (const { email, grupos } of await montarDigests(db)) {
+    const certidoes = pendentes.get(email) ?? [];
+    pendentes.delete(email);
     const ids = escolherParaResumo(grupos.flatMap((g) => g.editais)).map((e) => e.id);
     const resumos = await resumosDoCache(db, ids);
-    await sendMail({ to: email, ...renderDigest(appUrl, grupos, new Date(), resumos) });
+    await sendMail({ to: email, ...renderDigest(appUrl, grupos, new Date(), resumos, avisosDasCertidoes(certidoes, hoje)) });
     // Recorded only after the send succeeds, so a failed SMTP call retries the same editais next run.
     for (const g of grupos) {
       await db.query(
@@ -224,9 +283,17 @@ export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => 
         [g.alert.id, g.editais.map((e) => e.id)],
       );
     }
+    await marcarAvisadas(db, certidoes.map((c) => c.id), hoje);
     enviados++;
     log(`${email}: ${grupos.reduce((n, g) => n + g.editais.length, 0)} editais`);
   }
+  for (const [email, certidoes] of pendentes) {
+    await sendMail({ to: email, ...renderAvisoCertidoes(appUrl, avisosDasCertidoes(certidoes, hoje)) });
+    await marcarAvisadas(db, certidoes.map((c) => c.id), hoje);
+    enviados++;
+    log(`${email}: aviso de ${certidoes.length} certidão(ões)`);
+  }
   return enviados;
 }
+
 

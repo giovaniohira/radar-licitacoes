@@ -4,6 +4,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
 import { EditalRow, EditalRows, Empty, Interesse, Loading, editalHref } from "@/components/ui";
+import { ROTULO_DO_SELO, estadoDaCertidao, hojeBR, listarCertidoes, nomeDaCertidao, selosDoPipeline, TIPOS_FIXOS, type Certidao } from "@/lib/certidoes";
 import { pool, query } from "@/lib/db";
 import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazoTom, tituloCurto } from "@/lib/format";
 import { first } from "@/lib/params";
@@ -180,15 +181,62 @@ function EmDisputa({ itens }: { itens: PipelineItem[] }) {
   );
 }
 
+/** The state of the five certificates, or an invitation to register them; and the disputes whose session comes after one expires. */
+function CertidoesCard({ certidoes, itens }: { certidoes: Certidao[]; itens: PipelineItem[] }) {
+  const hoje = hojeBR();
+  const selos = selosDoPipeline(itens, certidoes, hoje);
+  const fixas = new Map(certidoes.filter((c) => c.tipo !== "outra").map((c) => [c.tipo, c]));
+  const cadastradas = certidoes.length;
+  return (
+    <section className="card card-pad stack" style={{ gap: 10 }}>
+      <div className="card-title">
+        <h2>Certidões</h2>
+        <Link href="/certidoes">{cadastradas ? "Ver todas" : "Cadastrar"}</Link>
+      </div>
+      {cadastradas === 0 ? (
+        <p className="small muted">Cadastre as datas das suas certidões. Avisamos antes de vencerem, e antes de uma sessão em que elas não valem mais.</p>
+      ) : (
+        <ul className="cert-resumo">
+          {TIPOS_FIXOS.map((t) => {
+            const c = fixas.get(t.id);
+            const e = c && estadoDaCertidao(c.valida_ate, hoje);
+            return (
+              <li key={t.id}>
+                <span>{t.nome.replace(/ \(.*\)/, "")}</span>
+                {e ? <span className={`pill cert-${e.tom}`}>{e.texto}</span> : <span className="pill">sem data</span>}
+              </li>
+            );
+          })}
+          {certidoes
+            .filter((c) => c.tipo === "outra" && estadoDaCertidao(c.valida_ate, hoje).tom !== "ok")
+            .map((c) => (
+              <li key={c.id}>
+                <span>{nomeDaCertidao(c)}</span>
+                <span className={`pill cert-${estadoDaCertidao(c.valida_ate, hoje).tom}`}>{estadoDaCertidao(c.valida_ate, hoje).texto}</span>
+              </li>
+            ))}
+        </ul>
+      )}
+      {selos.size > 0 && (
+        <p className="small" style={{ paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+          <span className="selo-cert">{ROTULO_DO_SELO}</span>{" "}
+          <Link href="/pipeline">{plural(selos.size, "disputa", "disputas")}</Link>
+        </p>
+      )}
+    </section>
+  );
+}
+
 async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchParams">) {
   await connection();
   const user = await requireUser();
   const sp = await searchParams;
   const aba = first(sp.alerta);
-  const [itens, alerts, [{ resumiu }]] = await Promise.all([
+  const [itens, alerts, [{ resumiu }], certidoes] = await Promise.all([
     listPipeline(pool(), user.id),
     query<AlertRow>(`select id, nome, palavras, ufs, modalidades, valor_min, valor_max from alerts where user_id = $1 and ativo order by id`, [user.id]),
     query<{ resumiu: boolean }>(`select exists (select 1 from pipeline p join resumos r using (edital_id) where p.user_id = $1) as resumiu`, [user.id]),
+    listarCertidoes(pool(), user.id),
   ]);
 
   // New matches per alert in the last 24h, same query the daily digest uses.
@@ -311,6 +359,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
         <aside className="col-side" aria-label="Sua semana e disputas">
           <Semana itens={itens} />
           <EmDisputa itens={itens} />
+          <CertidoesCard certidoes={certidoes} itens={itens} />
         </aside>
       </div>
     </div>
