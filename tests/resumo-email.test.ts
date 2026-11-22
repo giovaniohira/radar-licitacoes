@@ -51,7 +51,7 @@ describe("blocoDoResumo", () => {
     expect(blocoDoResumo(resumo())).toEqual({
       objeto: "Aquisição de 40 notebooks para a secretaria.",
       prazo: "Limite de propostas: 02/12/2026 09:00",
-      meEpp: "Exclusivo ME/EPP",
+      meEpp: "reservada ou com cota para ME/EPP",
       atencao: ["Amostra em 3 dias úteis", "Visita técnica obrigatória"],
     });
   });
@@ -72,8 +72,17 @@ describe("blocoDoResumo", () => {
 
   it("copes with a thin summary", () => {
     const b = blocoDoResumo(resumo({ prazos: [], exclusivo_me_epp: false, pontos_de_atencao: [" ", ""] }));
-    expect(b).toMatchObject({ prazo: null, meEpp: "Ampla concorrência", atencao: [] });
+    expect(b).toMatchObject({ prazo: null, meEpp: "ampla concorrência", atencao: [] });
     expect(blocoDoResumo(resumo({ prazos: [{ evento: "Sessão pública", data: "01/12/2026" }] })).prazo).toBe("Sessão pública: 01/12/2026");
+  });
+
+  it("cuts a long attention point at a whole sentence, or at a whole word", () => {
+    const frase1 = "A garantia de proposta é de 1% do valor estimado e deve ser entregue pelo licitante antes da sessão pública.";
+    const longa = `${frase1} ${"Detalhe adicional sem fim ".repeat(8)}`;
+    expect(blocoDoResumo(resumo({ pontos_de_atencao: [longa] })).atencao[0]).toBe(frase1);
+    const cortado = blocoDoResumo(resumo({ pontos_de_atencao: ["palavra ".repeat(40)] })).atencao[0];
+    expect(cortado.endsWith("palavra…")).toBe(true);
+    expect(cortado.length).toBeLessThanOrEqual(170);
   });
 });
 
@@ -95,8 +104,8 @@ describe("renderDigest with summaries", () => {
     // sem-resumo (4.5 days) is the second nearest eligible but has no summary: it goes without a block, not with an error.
     expect((com.html.match(/Resumo por IA · confira no edital/g) ?? []).length).toBe(2);
     expect(com.html).toContain("Compra de &lt;b&gt;itens&lt;/b&gt; &amp; &quot;peças&quot;.");
-    expect(com.html).toContain("Exclusivo ME/EPP");
-    expect(com.html).toContain("Ampla concorrência");
+    expect(com.html).toContain("reservada ou com cota para ME/EPP");
+    expect(com.html).toContain("ampla concorrência");
     expect(com.html).toContain("https://x.test/edital/e1");
     expect(com.html).not.toMatch(/undefined|null|NaN/);
     expect(sem.html).not.toContain("Resumo por IA");
@@ -107,7 +116,7 @@ describe("renderDigest with summaries", () => {
     const resumos = new Map([["e1", resumo()]]);
     const { text } = renderDigest("https://x.test", grupos, AGORA, resumos);
     expect(text).toContain("Resumo por IA (confira no edital): Aquisição de 40 notebooks para a secretaria.");
-    expect(text).toContain("Prazo: Limite de propostas: 02/12/2026 09:00");
+    expect(text).toContain("Prazo no edital: Limite de propostas: 02/12/2026 09:00");
     expect(text).toContain("Atenção: Amostra em 3 dias úteis");
     expect(text).toContain("Ver resumo completo: https://x.test/edital/e1");
   });
