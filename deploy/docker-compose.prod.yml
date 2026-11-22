@@ -7,6 +7,9 @@ services:
       POSTGRES_USER: radar
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
       POSTGRES_DB: radar
+    # The data (about 2 GB, and growing with the contracts backfill) outgrew 384 MB: cold index and heap reads took seconds.
+    # 1 GB for the container leaves about 1.9 GB of the VPS free for the web app, n8n and BG's API.
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "effective_cache_size=640MB"]
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,7 +18,7 @@ services:
       retries: 5
     deploy:
       resources:
-        limits: { memory: 384m, cpus: "0.5" }
+        limits: { memory: 1g, cpus: "0.5" }
 
   jobs:
     image: ghcr.io/giovaniohira/radar-licitacoes-jobs:${IMAGE_TAG:-latest}
