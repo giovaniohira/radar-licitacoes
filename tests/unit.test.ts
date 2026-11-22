@@ -11,6 +11,9 @@ import { whereContratos } from "@/lib/mercado";
 import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
 import { minimoDePalavras, prefiltroGin, termosDoObjeto } from "@/lib/quemganhou";
 import { aplicativo, faq, landing, organizacao, serializar, trilha } from "@/lib/schema";
+import { fornecedorIndexavel, orgaoIndexavel } from "@/lib/indexacao";
+import { llmsTxt } from "@/lib/llms";
+import { ARQUIVOS, MAX_URLS, indice, maisRecente, urlset } from "@/lib/sitemap";
 import { FILTRADAS, PRIVADAS, ROBOS_IA_BUSCA, ROBOS_IA_TREINO, robotsFor } from "@/lib/robots";
 import nextConfig from "../next.config";
 import { tituloEdital } from "@/lib/seo";
@@ -358,6 +361,56 @@ describe("edital title", () => {
   it("drops a stray leading dash and keeps the title short", () => {
     expect(tituloEdital("- Contratação de empresa para readequação de rede", 60)).not.toMatch(/^-/);
     expect(tituloEdital("Aquisição de pneus ".repeat(10), 60).length).toBeLessThanOrEqual(61);
+describe("sitemap", () => {
+  it("writes a urlset with absolute escaped URLs and only true lastmod dates", () => {
+    const x = urlset("https://exemplo.com.br", [
+      { path: "/edital/a%2Fb", lastmod: new Date("2026-11-21T20:30:36Z") },
+      { path: "/x?a=1&b=2" },
+      { path: "/y", lastmod: "data inválida" },
+    ]);
+    expect(x).toContain("<loc>https://exemplo.com.br/edital/a%2Fb</loc><lastmod>2026-11-21T20:30:36.000Z</lastmod>");
+    expect(x).toContain("<loc>https://exemplo.com.br/x?a=1&amp;b=2</loc></url>");
+    expect(x).toContain("<loc>https://exemplo.com.br/y</loc></url>");
+    expect(x).not.toMatch(/changefreq|priority/);
+  });
+
+  it("never lists more than the protocol allows", () => {
+    const muitas = Array.from({ length: MAX_URLS + 10 }, (_, i) => ({ path: `/orgao/${i}` }));
+    expect(urlset("https://exemplo.com.br", muitas).match(/<url>/g)).toHaveLength(MAX_URLS);
+  });
+
+  it("indexes every file by name and finds the newest lastmod", () => {
+    expect(indice("https://exemplo.com.br", ARQUIVOS.map((nome) => ({ nome })))).toContain("<loc>https://exemplo.com.br/sitemaps/orgaos.xml</loc>");
+    expect(maisRecente([{ path: "/a", lastmod: "2026-01-01" }, { path: "/b", lastmod: "2026-03-01" }, { path: "/c" }])?.toISOString()).toBe("2026-03-01T00:00:00.000Z");
+    expect(maisRecente([{ path: "/a" }])).toBeNull();
+  });
+});
+
+describe("indexing thresholds", () => {
+  it("lists an orgao with enough contracts or any open edital, and no other", () => {
+    expect(orgaoIndexavel(10, 0)).toBe(true);
+    expect(orgaoIndexavel(0, 1)).toBe(true);
+    expect(orgaoIndexavel(9, 0)).toBe(false);
+  });
+
+  it("lists a fornecedor only with enough contracts across several buyers", () => {
+    expect(fornecedorIndexavel(10, 3)).toBe(true);
+    expect(fornecedorIndexavel(50, 2)).toBe(false);
+    expect(fornecedorIndexavel(9, 5)).toBe(false);
+  });
+});
+
+describe("llms.txt", () => {
+  const n = { abertas: 1234, contratos: 56789, de: "2026-07-23", ate: "2026-11-21", em: "22/11/2026" };
+
+  it("states the real price, the company and dated numbers", () => {
+    const t = llmsTxt("https://exemplo.com.br", n);
+    expect(t).toMatch(/^# Vencedital/);
+    expect(t).toContain("R$ 97 por mês");
+    expect(t).toContain("Em 22/11/2026");
+    expect(t).toContain("assinados entre 23/07/2026 e 21/11/2026");
+    expect(t).toContain("OHIRA TECNOLOGIA LTDA");
+    expect(t).not.toMatch(/undefined|null|NaN/);
   });
 });
 

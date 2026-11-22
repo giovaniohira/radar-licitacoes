@@ -7,6 +7,7 @@ import { HBars, ListaRanking, iniciais } from "@/components/charts";
 import { JsonLd } from "@/components/JsonLd";
 import { EditalRow, EditalRows, Empty, Interesse, Kpi, Loading, type EditalLinha } from "@/components/ui";
 import { pool, query } from "@/lib/db";
+import { FINA, orgaoPublicavel } from "@/lib/indexacao";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, local, nome, prazo } from "@/lib/format";
 import { analisar, orgaoInfo } from "@/lib/mercado";
 import { siteUrl, trilha } from "@/lib/schema";
@@ -21,7 +22,8 @@ export async function generateMetadata({ params }: PageProps<"/orgao/[cnpj]">): 
   if (!info) notFound();
   const title = nome(info.nome);
   const description = `Editais abertos, contratos dos últimos 12 meses e fornecedores que mais vendem para ${title} (${local(info.municipio, info.uf) || "Brasil"}).`;
-  return { title, description, alternates: { canonical: `/orgao/${cnpj}` }, openGraph: { title, description } };
+  const fina = !(await orgaoPublicavel(pool(), cnpj));
+  return { title, description, alternates: { canonical: `/orgao/${cnpj}` }, openGraph: { title, description }, ...(fina && FINA) };
 }
 
 const ESFERA: Record<string, string> = { M: "Municipal", E: "Estadual", F: "Federal", D: "Distrital" };
