@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { AuthLayout } from "@/components/AuthLayout";
 import { LoginForm } from "./LoginForm";
 
-export const metadata: Metadata = { title: "Entrar" };
+export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
 
 // ?erro=1: a link that expired or was used. ?link: open straight on "Entrar com link".
 async function Conteudo({ searchParams }: PageProps<"/entrar">) {
