@@ -2,7 +2,10 @@ import type { Pool } from "pg";
 import { escapeHtml, sendMail, type Mail } from "./mail";
 import { EMPRESA } from "./empresa";
 import { formatBRL, formatData, frase, local, nome, prazo } from "./format";
+import type { EditalRow } from "./pncp";
+import { blocoDoResumo, escolherParaResumo, resumoParaEmail, resumosDoCache, tetoDiario } from "./resumo-email";
 import { buildSearch, type EditalResumo } from "./search";
+import type { Resumo } from "./summary";
 
 export interface Alert {
   id: number;
@@ -49,12 +52,38 @@ export async function matchesForAlert(db: Pool, a: Alert): Promise<EditalResumo[
 const C = { text: "#18181b", muted: "#5f5f6b", border: "#e6e6e9", accent: "#1e293b", warn: "#b42318", bg: "#fbfbfa" };
 
 /** Table-based HTML so it renders the same in Gmail, Outlook and Apple Mail. */
-export function renderDigest(appUrl: string, grupos: { alert: Alert; editais: EditalResumo[] }[], now = new Date()): Omit<Mail, "to"> {
+/** One e-mail's alert groups. */
+type Grupos = { alert: Alert; editais: EditalResumo[] }[];
+
+export function renderDigest(appUrl: string, grupos: Grupos, now = new Date(), resumos: Map<string, Resumo> = new Map()): Omit<Mail, "to"> {
   const total = grupos.reduce((n, g) => n + g.editais.length, 0);
   const subject = `${total} ${total === 1 ? "novo edital" : "novos editais"} para você`;
   const link = (e: EditalResumo) => `${appUrl}/edital/${encodeURIComponent(e.id)}`;
   const quando = (e: EditalResumo) =>
     e.encerramento ? `propostas até ${formatData(e.encerramento)} (${prazo(e.encerramento, now)})` : "prazo não informado no PNCP";
+
+  // The (up to) three editais that may carry an AI summary; a block shows only when its summary exists, never an error.
+  const comResumo = new Map(
+    escolherParaResumo(
+      grupos.flatMap((g) => g.editais),
+      now,
+    )
+      .filter((e) => resumos.has(e.id))
+      .map((e) => [e.id, blocoDoResumo(resumos.get(e.id)!)] as const),
+  );
+  // An edital listed by two alerts shows its block under the first one only. The text and the HTML each keep their own
+  // record of what they already showed.
+  const porVersao = () => {
+    const mostrados = new Set<string>();
+    return (e: EditalResumo) => {
+      const b = comResumo.get(e.id);
+      if (!b || mostrados.has(e.id)) return null;
+      mostrados.add(e.id);
+      return b;
+    };
+  };
+  const blocoTexto = porVersao();
+  const blocoParaHtml = porVersao();
 
   const text = [
     subject,
@@ -62,12 +91,32 @@ export function renderDigest(appUrl: string, grupos: { alert: Alert; editais: Ed
       (g) =>
         `\n## ${g.alert.nome}\n\n` +
         g.editais
-          .map((e) => `- ${frase(e.objeto)}\n  ${nome(e.orgao)} · ${local(e.municipio, e.uf)}\n  ${formatBRL(e.valor_estimado)} · ${quando(e)}\n  ${link(e)}`)
+          .map((e) => {
+            const b = blocoTexto(e);
+            const resumo = b
+              ? `\n  Resumo por IA (confira no edital): ${b.objeto}\n${[b.prazo && `  Prazo: ${b.prazo}`, `  ${b.meEpp}`, ...b.atencao.map((a) => `  Atenção: ${a}`)]
+                  .filter(Boolean)
+                  .join("\n")}\n  Ver resumo completo: ${link(e)}`
+              : "";
+            return `- ${frase(e.objeto)}\n  ${nome(e.orgao)} · ${local(e.municipio, e.uf)}\n  ${formatBRL(e.valor_estimado)} · ${quando(e)}\n  ${link(e)}${resumo}`;
+          })
           .join("\n\n"),
     ),
     `\nGerenciar alertas: ${appUrl}/alertas`,
     `\n${AVISO_DIGEST}`,
   ].join("\n");
+
+  // Plain table cells and inline styles only, so Gmail, Outlook and Apple Mail draw the same block.
+  const blocoHtml = (e: EditalResumo) => {
+    const b = blocoParaHtml(e);
+    if (!b) return "";
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr><td style="background:#f1f5f9;border-left:3px solid ${C.accent};padding:10px 12px;font-size:13px;line-height:19px;color:${C.text}">
+<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${C.muted}">Resumo por IA · confira no edital</div>
+<div style="margin-top:4px">${escapeHtml(b.objeto)}</div>
+${b.prazo ? `<div style="margin-top:4px"><b>Prazo:</b> ${escapeHtml(b.prazo)}</div>\n` : ""}<div style="margin-top:4px"><b>Participação:</b> ${escapeHtml(b.meEpp)}</div>
+${b.atencao.map((a) => `<div style="margin-top:4px;color:${C.warn}"><b>Atenção:</b> ${escapeHtml(a)}</div>\n`).join("")}<div style="margin-top:6px"><a href="${link(e)}" style="color:${C.accent};font-weight:600;text-decoration:underline">Ver resumo completo</a></div>
+</td></tr></table>`;
+  };
 
   const linhas = (g: { alert: Alert; editais: EditalResumo[] }) =>
     g.editais
@@ -75,7 +124,7 @@ export function renderDigest(appUrl: string, grupos: { alert: Alert; editais: Ed
         (e) => `<tr><td style="padding:14px 0;border-bottom:1px solid ${C.border}">
 <a href="${link(e)}" style="color:${C.text};font-weight:600;font-size:14px;line-height:20px;text-decoration:none">${escapeHtml(frase(e.objeto).slice(0, 220))}</a>
 <div style="font-size:12px;color:${C.muted};margin-top:4px">${escapeHtml(nome(e.orgao))} · ${escapeHtml(local(e.municipio, e.uf))} · ${escapeHtml(e.modalidade ?? "")}</div>
-<div style="font-size:13px;margin-top:6px"><b>${escapeHtml(formatBRL(e.valor_estimado))}</b> <span style="color:${C.warn}">· ${escapeHtml(quando(e))}</span></div>
+<div style="font-size:13px;margin-top:6px"><b>${escapeHtml(formatBRL(e.valor_estimado))}</b> <span style="color:${C.warn}">· ${escapeHtml(quando(e))}</span></div>${blocoHtml(e)}
 </td></tr>`,
       )
       .join("");
@@ -106,8 +155,13 @@ ${grupos
   return { subject, html, text };
 }
 
-/** Sends one digest per user covering all their active alerts. Returns how many e-mails went out. */
-export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => void = () => {}): Promise<number> {
+export interface DigestDoUsuario {
+  email: string;
+  grupos: Grupos;
+}
+
+/** Who gets an e-mail now and what is in it: the open, not-yet-sent editais of each user's active alerts. */
+export async function montarDigests(db: Pool): Promise<DigestDoUsuario[]> {
   const alerts = (
     await db.query<Alert & { email: string }>(
       `select a.*, u.email from alerts a join users u on u.id = a.user_id where a.ativo order by a.user_id, a.id`,
@@ -116,15 +170,53 @@ export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => 
   const porUsuario = new Map<string, (Alert & { email: string })[]>();
   for (const a of alerts) porUsuario.set(a.email, [...(porUsuario.get(a.email) ?? []), a]);
 
-  let enviados = 0;
+  const digests: DigestDoUsuario[] = [];
   for (const [email, userAlerts] of porUsuario) {
-    const grupos: { alert: Alert; editais: EditalResumo[] }[] = [];
+    const grupos: Grupos = [];
     for (const alert of userAlerts) {
       const editais = await matchesForAlert(db, alert);
       if (editais.length) grupos.push({ alert, editais });
     }
-    if (!grupos.length) continue;
-    await sendMail({ to: email, ...renderDigest(appUrl, grupos) });
+    if (grupos.length) digests.push({ email, grupos });
+  }
+  return digests;
+}
+
+/**
+ * The 06h step before the 7h send: makes sure the editais that get a summary block in each e-mail have a summary.
+ * Stops at `maxMs` so the 7h send is never late; whatever is missing then goes out without a block.
+ */
+export async function prepararResumosDoDigest(
+  db: Pool,
+  { maxMs = 35 * 60_000, log = () => {}, now = () => new Date() }: { maxMs?: number; log?: (m: string) => void; now?: () => Date } = {},
+): Promise<{ escolhidos: number; resumidos: number }> {
+  if (tetoDiario() <= 0) return { escolhidos: 0, resumidos: 0 };
+  const inicio = Date.now();
+  const ids = new Set<string>();
+  for (const d of await montarDigests(db)) {
+    for (const e of escolherParaResumo(d.grupos.flatMap((g) => g.editais), now())) ids.add(e.id);
+  }
+  const prontos = await resumosDoCache(db, [...ids]);
+  let resumidos = 0;
+  for (const id of ids) {
+    if (prontos.has(id)) continue;
+    if (Date.now() - inicio > maxMs) {
+      log("resumos do e-mail: tempo esgotado, os editais que faltam seguem sem bloco");
+      break;
+    }
+    const { rows } = await db.query<EditalRow>(`select * from editais where id = $1`, [id]);
+    if (rows[0] && (await resumoParaEmail(db, rows[0]))) resumidos++;
+  }
+  return { escolhidos: ids.size, resumidos };
+}
+
+/** Sends one digest per user covering all their active alerts. Returns how many e-mails went out. */
+export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => void = () => {}): Promise<number> {
+  let enviados = 0;
+  for (const { email, grupos } of await montarDigests(db)) {
+    const ids = escolherParaResumo(grupos.flatMap((g) => g.editais)).map((e) => e.id);
+    const resumos = await resumosDoCache(db, ids);
+    await sendMail({ to: email, ...renderDigest(appUrl, grupos, new Date(), resumos) });
     // Recorded only after the send succeeds, so a failed SMTP call retries the same editais next run.
     for (const g of grupos) {
       await db.query(
@@ -137,3 +229,4 @@ export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => 
   }
   return enviados;
 }
+

@@ -42,7 +42,12 @@ export async function downloadPdf(url: string, fetchImpl: typeof fetch = fetch):
   return buf;
 }
 
-export async function summarizePdf(pdf: Buffer, client = new Anthropic()): Promise<{ resumo: Resumo; modelo: string }> {
+export interface UsoDeTokens {
+  entrada: number;
+  saida: number;
+}
+
+export async function summarizePdf(pdf: Buffer, client = new Anthropic()): Promise<{ resumo: Resumo; modelo: string; uso: UsoDeTokens }> {
   const response = await client.beta.messages.parse({
     model: process.env.RESUMO_MODEL ?? "claude-opus-5-5",
     max_tokens: 16000,
@@ -64,7 +69,25 @@ export async function summarizePdf(pdf: Buffer, client = new Anthropic()): Promi
   if (response.stop_reason === "max_tokens" || !response.parsed_output) {
     throw new ResumoError("O resumo veio incompleto; tente de novo.");
   }
-  return { resumo: response.parsed_output, modelo: response.model };
+  return {
+    resumo: response.parsed_output,
+    modelo: response.model,
+    uso: { entrada: response.usage?.input_tokens ?? 0, saida: response.usage?.output_tokens ?? 0 },
+  };
+}
+
+/** Downloads the edital, summarizes it with Claude and stores it (one summary per edital, shared by everyone). */
+export async function gerarResumo(db: Pool, edital: EditalRow): Promise<{ dados: Resumo; documento: string; uso: UsoDeTokens; modelo: string }> {
+  const arquivo = pickEdital(await fetchArquivos(edital));
+  if (!arquivo) throw new ResumoError("Este edital não tem documentos publicados no PNCP.");
+  const { resumo, modelo, uso } = await summarizePdf(await downloadPdf(arquivo.url));
+  await db.query(`insert into resumos (edital_id, documento, dados, modelo) values ($1, $2, $3, $4) on conflict (edital_id) do nothing`, [
+    edital.id,
+    arquivo.url,
+    JSON.stringify(resumo),
+    modelo,
+  ]);
+  return { dados: resumo, documento: arquivo.url, uso, modelo };
 }
 
 /**
@@ -85,14 +108,8 @@ export async function getOrCreateResumo(db: Pool, edital: EditalRow, userId: num
     throw new ResumoError(`Limite de ${LIMITE_DIARIO} resumos por dia atingido.`);
   }
   try {
-    const arquivo = pickEdital(await fetchArquivos(edital));
-    if (!arquivo) throw new ResumoError("Este edital não tem documentos publicados no PNCP.");
-    const { resumo, modelo } = await summarizePdf(await downloadPdf(arquivo.url));
-    await db.query(
-      `insert into resumos (edital_id, documento, dados, modelo) values ($1, $2, $3, $4) on conflict (edital_id) do nothing`,
-      [edital.id, arquivo.url, JSON.stringify(resumo), modelo],
-    );
-    return { dados: resumo, documento: arquivo.url };
+    const { dados, documento } = await gerarResumo(db, edital);
+    return { dados, documento };
   } catch (err) {
     await db.query(`update resumo_uso set total = total - 1 where user_id = $1 and dia = current_date`, [userId]);
     if (err instanceof ResumoError) throw err;
