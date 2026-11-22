@@ -6,7 +6,6 @@ import {
   LOGIN_TOKEN_MINUTES,
   RESET_TOKEN_MINUTES,
   VERIFY_TOKEN_MINUTES,
-  formatCnpj,
   hashSenha,
   hashToken,
   newLoginToken,
@@ -21,9 +20,6 @@ import { query } from "./db";
 import { escapeHtml, sendMail } from "./mail";
 
 export type TipoToken = "login" | "verificar" | "senha" | "email";
-
-/** Pending the product spec: the CNPJ is asked at sign-up so the CNPJ sign-in and "one trial per CNPJ" work from day one. */
-export const CNPJ_OBRIGATORIO = true;
 
 export const LIMITE_FALHAS_CONTA = 5;
 export const LIMITE_FALHAS_IP = 30;
@@ -152,13 +148,9 @@ export type Resposta = { ok?: string; error?: string };
  * Same answer whether or not the address already has an account; what differs is only the e-mail that arrives:
  * a confirmation link for a new (or still unconfirmed) account, a sign-in link for an existing one.
  */
-export async function criarConta(dados: { email: string; senha: string; cnpj: string }): Promise<Resposta> {
+export async function criarConta(dados: { email: string; senha: string }): Promise<Resposta> {
   const email = normalizeEmail(dados.email);
   if (!email) return { error: "E-mail inválido." };
-  const cnpjDigitado = dados.cnpj.trim();
-  const cnpj = cnpjDigitado ? normalizeCnpj(cnpjDigitado) : null;
-  if (cnpjDigitado && !cnpj) return { error: "CNPJ inválido. Confira os números." };
-  if (!cnpj && CNPJ_OBRIGATORIO) return { error: "Informe o CNPJ da empresa." };
   const problema = problemaSenha(dados.senha);
   if (problema) return { error: problema };
   const resposta = { ok: email };
@@ -172,39 +164,23 @@ export async function criarConta(dados: { email: string; senha: string; cnpj: st
     return resposta;
   }
 
-  // A CNPJ held by a confirmed account stays there; one held by an unconfirmed sign-up is released.
-  let cnpjLivre = cnpj;
-  const extra: string[] = [];
-  if (cnpj) {
-    const [dono] = await query<{ id: number; verificado: boolean }>(`select id, email_verificado_em is not null as verificado from users where cnpj = $1`, [cnpj]);
-    if (dono?.verificado) {
-      cnpjLivre = null;
-      extra.push(
-        `O CNPJ ${formatCnpj(cnpj)} já está em outra conta do Vencedital, então sua conta foi criada sem ele. Você entra pelo e-mail.` +
-          (EMPRESA.contato ? ` Se a empresa é sua, escreva para ${EMPRESA.contato}.` : ""),
-      );
-    } else if (dono && dono.id !== existente?.id) {
-      await query(`update users set cnpj = null where id = $1 and email_verificado_em is null`, [dono.id]);
-    }
-  }
-
   const hash = await hashSenha(dados.senha);
   let userId: number;
   try {
     if (existente) {
       // Unconfirmed: whoever opens the newest link wins. Older links stop working, so an earlier link can't confirm this password.
       await query(`update login_tokens set usado_em = now() where user_id = $1 and tipo = 'verificar' and usado_em is null`, [existente.id]);
-      await query(`update users set senha_hash = $2, cnpj = $3 where id = $1`, [existente.id, hash, cnpjLivre]);
+      await query(`update users set senha_hash = $2 where id = $1`, [existente.id, hash]);
       userId = existente.id;
     } else {
-      [{ id: userId }] = await query<{ id: number }>(`insert into users (email, senha_hash, cnpj) values ($1, $2, $3) returning id`, [email, hash, cnpjLivre]);
+      [{ id: userId }] = await query<{ id: number }>(`insert into users (email, senha_hash) values ($1, $2) returning id`, [email, hash]);
     }
   } catch (err) {
-    // A concurrent sign-up took the e-mail or CNPJ between the checks and the write: answer the same as always.
+    // A concurrent sign-up took the e-mail between the check and the write: answer the same as always.
     if ((err as { code?: string }).code === "23505") return resposta;
     throw err;
   }
-  if (!(await enviarToken(userId, email, "verificar", { extra }))) return { error: ERRO_LINKS };
+  if (!(await enviarToken(userId, email, "verificar"))) return { error: ERRO_LINKS };
   return resposta;
 }
 
@@ -344,19 +320,22 @@ export async function trocarSenha(userId: number, atual: string, nova: string, d
   return { ok: u.senha_hash ? "Senha trocada. Os outros aparelhos foram desconectados." : "Senha criada. Agora você também entra com e-mail ou CNPJ e senha." };
 }
 
-/** From /conta: add or change the company's CNPJ (enables the CNPJ sign-in). */
-export async function definirCnpj(userId: number, bruto: string): Promise<Resposta> {
+/**
+ * Onboarding and /conta: saves the company's CNPJ (enables the CNPJ sign-in). One account per CNPJ: a second person
+ * from the same company waits for invitations. Only signed-in, confirmed accounts get here, so saying the CNPJ is
+ * taken reveals nothing to an anonymous visitor.
+ */
+export async function definirCnpj(userId: number, bruto: string): Promise<Resposta & { cnpj?: string }> {
   const cnpj = normalizeCnpj(bruto);
   if (!cnpj) return { error: "CNPJ inválido. Confira os números." };
-  const [dono] = await query<{ id: number; verificado: boolean }>(`select id, email_verificado_em is not null as verificado from users where cnpj = $1`, [cnpj]);
-  if (dono?.id === userId) return { ok: "CNPJ salvo." };
-  if (dono?.verificado) return { error: `Esse CNPJ já está em outra conta do Vencedital.${EMPRESA.contato ? ` Se a empresa é sua, escreva para ${EMPRESA.contato}.` : ""}` };
-  if (dono) await query(`update users set cnpj = null where id = $1 and email_verificado_em is null`, [dono.id]);
+  const ocupado = {
+    error: `Esse CNPJ já tem uma conta no Vencedital. Por enquanto é uma conta por empresa.${EMPRESA.contato ? ` Se a empresa é sua, escreva para ${EMPRESA.contato}.` : ""}`,
+  };
   try {
-    await query(`update users set cnpj = $2 where id = $1`, [userId, cnpj]);
+    const r = await query(`update users set cnpj = $2 where id = $1 and not exists (select 1 from users where cnpj = $2 and id <> $1) returning id`, [userId, cnpj]);
+    return r.length ? { ok: "CNPJ salvo.", cnpj } : ocupado;
   } catch (err) {
-    if ((err as { code?: string }).code === "23505") return { error: "Esse CNPJ já está em outra conta do Vencedital." };
+    if ((err as { code?: string }).code === "23505") return ocupado;
     throw err;
   }
-  return { ok: "CNPJ salvo." };
 }

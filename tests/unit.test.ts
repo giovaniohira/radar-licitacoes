@@ -17,6 +17,7 @@ import {
   verifySession,
 } from "@/lib/auth";
 import { AVISO_DIGEST, renderDigest, type Alert } from "@/lib/alerts";
+import { consultarCnpj, setoresDoCnae } from "@/lib/cnpj-publico";
 import { quemSomos } from "@/lib/empresa";
 import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
@@ -402,5 +403,33 @@ describe("quem ganhou: palavras do objeto", () => {
     // Every pair has one of the two leading words, so a contract that matches only trailing words is never required.
     expect(prefiltroGin(["aaaa", "bbbb", "cccc", "dddd"])).toBe("(aaaa & bbbb) | (aaaa & cccc) | (aaaa & dddd) | (bbbb & cccc) | (bbbb & dddd)");
     expect(prefiltroGin([])).toBe("");
+  });
+});
+
+describe("CNPJ public data", () => {
+  it("maps CNAE classes to onboarding sectors, main activity first", () => {
+    expect(setoresDoCnae(["8121400", "4751201"])).toEqual(["limpeza", "ti"]);
+    expect(setoresDoCnae(["6319400", "4751201", "6201501"])).toEqual(["ti"]);
+    expect(setoresDoCnae(["0111301"])).toEqual([]);
+    expect(setoresDoCnae([])).toEqual([]);
+  });
+  it("reads state and CNAEs, and returns null on any failure", async () => {
+    const ok = (async () =>
+      new Response(JSON.stringify({ razao_social: "EMPRESA X LTDA", uf: "RO", cnae_fiscal: 4751201, cnaes_secundarios: [{ codigo: 0 }, { codigo: 8121400 }] }))) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", ok)).toEqual({ razaoSocial: "EMPRESA X LTDA", uf: "RO", cnaes: ["4751201", "8121400"] });
+    const notFound = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", notFound)).toBeNull();
+    // First source refuses, the fallback answers.
+    const urls: string[] = [];
+    const fallback = (async (u: string) => {
+      urls.push(u);
+      return urls.length === 1 ? new Response("Forbidden", { status: 403 }) : new Response(JSON.stringify({ uf: "SP", cnae_fiscal: "6201-5/01" }));
+    }) as typeof fetch;
+    expect(await consultarCnpj("06990590000123", fallback)).toEqual({ razaoSocial: "", uf: "SP", cnaes: ["6201501"] });
+    expect(urls[1]).toBe("https://minhareceita.org/06990590000123");
+    const down = (async () => {
+      throw new Error("timeout");
+    }) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", down)).toBeNull();
   });
 });

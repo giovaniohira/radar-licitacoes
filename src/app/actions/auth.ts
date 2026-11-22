@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE, SESSION_DAYS, normalizeEmail, signSession } from "@/lib/auth";
+import { consultarCnpj, setoresDoCnae } from "@/lib/cnpj-publico";
 import * as contas from "@/lib/contas";
 import { query } from "@/lib/db";
 import { requireUser } from "@/lib/session";
@@ -37,7 +38,7 @@ async function destino(userId: number): Promise<string> {
 
 export async function criarConta(_: FormState, form: FormData): Promise<FormState> {
   if (await contas.excedeuEnviosIp(await ip())) return { error: ERRO_ENVIOS };
-  return contas.criarConta({ email: campo(form, "email"), senha: campo(form, "senha"), cnpj: campo(form, "cnpj") });
+  return contas.criarConta({ email: campo(form, "email"), senha: campo(form, "senha") });
 }
 
 export async function reenviarVerificacao(_: FormState, form: FormData): Promise<FormState> {
@@ -93,7 +94,19 @@ export async function trocarSenha(_: FormState, form: FormData): Promise<FormSta
 
 export async function salvarCnpj(_: FormState, form: FormData): Promise<FormState> {
   const user = await requireUser();
-  return contas.definirCnpj(user.id, campo(form, "cnpj"));
+  const r = await contas.definirCnpj(user.id, campo(form, "cnpj"));
+  return r.error ? { error: r.error } : { ok: r.ok };
+}
+
+export type CnpjOnboarding = { error?: string; razaoSocial?: string; uf?: string | null; setores?: string[] } | null;
+
+/** First onboarding step: saves the CNPJ, then reads its public data to pre-select the sectors and the state. */
+export async function cnpjOnboarding(cnpj: string): Promise<CnpjOnboarding> {
+  const user = await requireUser();
+  const r = await contas.definirCnpj(user.id, cnpj);
+  if (r.error || !r.cnpj) return { error: r.error };
+  const dados = await consultarCnpj(r.cnpj);
+  return dados ? { razaoSocial: dados.razaoSocial, uf: dados.uf, setores: setoresDoCnae(dados.cnaes) } : {};
 }
 
 export async function trocarEmail(_: FormState, form: FormData): Promise<FormState> {

@@ -6,12 +6,17 @@ import { valorCurto } from "@/components/ui";
 import { formatInt, frase, nome as nomeOrgao, prazo, tituloCurto } from "@/lib/format";
 import { FAIXAS, SETORES, UFS } from "@/lib/setores";
 import { concluirOnboarding, previewAlerta, pularOnboarding, type Preview } from "../actions/alertas";
+import { cnpjOnboarding } from "../actions/auth";
 
-const PASSOS = ["O que você vende", "Estados", "Tamanho do contrato", "Seu alerta"];
+const PASSOS = ["Sua empresa", "O que você vende", "Estados", "Tamanho do contrato", "Seu alerta"];
 const exemplo = (palavras: string) => palavras.split(",").slice(0, 3).join(",");
 
-export function Onboarding({ email }: { email: string }) {
+export function Onboarding({ email, cnpj: cnpjSalvo }: { email: string; cnpj: string }) {
   const [passo, setPasso] = useState(0);
+  const [cnpj, setCnpj] = useState(cnpjSalvo);
+  const [empresa, setEmpresa] = useState<{ razao?: string; uf?: string | null; achou: boolean } | null>(null);
+  const [erroCnpj, setErroCnpj] = useState("");
+  const [buscando, buscar] = useTransition();
   const [setores, setSetores] = useState<string[]>([]);
   const [palavras, setPalavras] = useState("");
   const [nome, setNome] = useState("");
@@ -25,11 +30,27 @@ export function Onboarding({ email }: { email: string }) {
 
   // Sectors are a starting point: picking one rewrites the keywords and the alert name, which stay editable.
   function toggleSetor(id: string) {
-    const ids = setores.includes(id) ? setores.filter((s) => s !== id) : [...setores, id];
+    escolherSetores(setores.includes(id) ? setores.filter((s) => s !== id) : [...setores, id]);
+  }
+
+  function escolherSetores(ids: string[]) {
     const escolhidos = SETORES.filter((s) => ids.includes(s.id));
     setSetores(ids);
     setPalavras(escolhidos.map((s) => s.palavras).join(", "));
     setNome(escolhidos.map((s) => s.nome).join(" e ").slice(0, 80));
+  }
+
+  // Step 1: save the CNPJ, then pre-select sectors and the state from its public data. Everything stays editable.
+  function salvarCnpj() {
+    setErroCnpj("");
+    buscar(async () => {
+      const r = await cnpjOnboarding(cnpj);
+      if (!r || r.error) return setErroCnpj(r?.error ?? "Não deu para salvar. Tente de novo.");
+      if (r.setores?.length && !palavras.trim()) escolherSetores(r.setores.slice(0, 2));
+      if (r.uf && !ufs.length) setUfs([r.uf]);
+      setEmpresa({ razao: r.razaoSocial, uf: r.uf, achou: !!r.setores?.length });
+      ir(1);
+    });
   }
 
   // Live count of open editais for the answers so far.
@@ -67,7 +88,41 @@ export function Onboarding({ email }: { email: string }) {
         <form ref={form} action={action} className="onb-form">
           <section hidden={passo !== 0} className="onb-step">
             <div>
-              <p className="k">Passo 1 de 4</p>
+              <p className="k">Passo 1 de 5</p>
+              <h1>Qual é o CNPJ da sua empresa?</h1>
+              <p>Com ele já marcamos o seu ramo e o seu estado nos próximos passos. E você passa a poder entrar com o CNPJ no lugar do e-mail.</p>
+            </div>
+            <label className="field" style={{ fontSize: 13, fontWeight: 550 }}>
+              CNPJ
+              <input
+                className="input input-lg"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (cnpj.trim()) salvarCnpj();
+                  }
+                }}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                placeholder="00.000.000/0000-00"
+                autoFocus
+              />
+            </label>
+            {erroCnpj && <div className="notice">{erroCnpj}</div>}
+          </section>
+
+          <section hidden={passo !== 1} className="onb-step">
+            <div>
+              <p className="k">Passo 2 de 5</p>
+              {empresa?.razao && (
+                <p className="small muted">
+                  {empresa.razao}
+                  {empresa.achou ? ": já marcamos o ramo pelo CNAE da empresa. Ajuste se precisar." : ""}
+                </p>
+              )}
               <h1>O que sua empresa vende para o governo?</h1>
               <p>Escolha um ou mais setores. Eles viram as palavras-chave que o Vencedital procura todo dia no PNCP.</p>
             </div>
@@ -91,11 +146,13 @@ export function Onboarding({ email }: { email: string }) {
             </label>
           </section>
 
-          <section hidden={passo !== 1} className="onb-step">
+          <section hidden={passo !== 2} className="onb-step">
             <div>
-              <p className="k">Passo 2 de 4</p>
+              <p className="k">Passo 3 de 5</p>
               <h1>Em quais estados você quer vender?</h1>
-              <p>Deixe tudo desmarcado para receber editais do Brasil inteiro.</p>
+              <p>
+                {empresa?.uf ? `Já marcamos ${empresa.uf}, onde fica sua empresa. ` : ""}Deixe tudo desmarcado para receber editais do Brasil inteiro.
+              </p>
             </div>
             <div className="uf-chips" style={{ gap: 6 }}>
               {UFS.map((u) => (
@@ -113,9 +170,9 @@ export function Onboarding({ email }: { email: string }) {
             </div>
           </section>
 
-          <section hidden={passo !== 2} className="onb-step">
+          <section hidden={passo !== 3} className="onb-step">
             <div>
-              <p className="k">Passo 3 de 4</p>
+              <p className="k">Passo 4 de 5</p>
               <h1>Qual tamanho de contrato faz sentido?</h1>
               <p>Pelo valor estimado do edital. Dá para mudar depois em Alertas.</p>
             </div>
@@ -137,9 +194,9 @@ export function Onboarding({ email }: { email: string }) {
             <input type="hidden" name="max" value={FAIXAS[faixa].max} />
           </section>
 
-          <section hidden={passo !== 3} className="onb-step">
+          <section hidden={passo !== 4} className="onb-step">
             <div>
-              <p className="k">Passo 4 de 4</p>
+              <p className="k">Passo 5 de 5</p>
               <h1>Seu primeiro alerta</h1>
               <p>
                 Todo dia às 7h, se houver edital novo, mandamos um e-mail para <b>{email}</b>. Só com o que você ainda não recebeu.
@@ -185,8 +242,12 @@ export function Onboarding({ email }: { email: string }) {
             <button type="button" className="btn" disabled={passo === 0} onClick={() => ir(passo - 1)}>
               Voltar
             </button>
-            {passo < 3 ? (
-              <button type="button" className="btn btn-primary" disabled={passo === 0 && !palavras.trim()} onClick={() => ir(passo + 1)}>
+            {passo === 0 ? (
+              <button type="button" className="btn btn-primary" disabled={buscando || !cnpj.trim()} onClick={salvarCnpj}>
+                {buscando ? "Buscando…" : "Continuar"}
+              </button>
+            ) : passo < 4 ? (
+              <button type="button" className="btn btn-primary" disabled={passo === 1 && !palavras.trim()} onClick={() => ir(passo + 1)}>
                 Continuar
               </button>
             ) : (

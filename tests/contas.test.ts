@@ -29,9 +29,9 @@ async function user(email: string) {
   return r.rows[0];
 }
 
-async function contaConfirmada(email: string, cnpj = "") {
-  expect(await c.criarConta({ email, senha: SENHA, cnpj })).toEqual({ ok: email });
-  return c.confirmarToken(ultimoToken(email));
+async function contaConfirmada(email: string) {
+  expect(await c.criarConta({ email, senha: SENHA })).toEqual({ ok: email });
+  return (await c.confirmarToken(ultimoToken(email)))!;
 }
 
 describe.skipIf(!url)("contas", () => {
@@ -67,13 +67,13 @@ describe.skipIf(!url)("contas", () => {
     expect((await user("usou@link.com")).senha_hash).toBeNull();
   });
 
-  it("signs up, asks for the e-mail, then signs in by e-mail or CNPJ", async () => {
-    expect(await c.criarConta({ email: " Nova@Empresa.com.br ", senha: SENHA, cnpj: CNPJ })).toEqual({ ok: "nova@empresa.com.br" });
+  it("signs up with e-mail and password, asks for the e-mail, takes the CNPJ in onboarding, then signs in by either", async () => {
+    expect(await c.criarConta({ email: " Nova@Empresa.com.br ", senha: SENHA })).toEqual({ ok: "nova@empresa.com.br" });
     expect(enviados).toHaveLength(1);
     expect(enviados[0].subject).toMatch(/Confirme seu e-mail/);
     expect(enviados[0].text).not.toContain(SENHA);
     const u = await user("nova@empresa.com.br");
-    expect(u.cnpj).toBe("68631511000145");
+    expect(u.cnpj).toBeNull();
     expect(u.senha_hash).toMatch(/^scrypt\$/);
 
     // Right password before confirming: no session, a fresh confirmation link instead.
@@ -84,6 +84,8 @@ describe.skipIf(!url)("contas", () => {
     expect(ok).toEqual({ userId: u.id, novo: true, emailNovo: null, emailTrocado: false });
     expect(await c.confirmarToken(ultimoToken())).toBeNull(); // single use
     expect(await c.entrarComSenha("NOVA@empresa.com.br", SENHA, "1.1.1.1")).toEqual({ userId: u.id });
+    expect(await c.entrarComSenha(CNPJ, SENHA, "1.1.1.1")).toEqual({ error: c.ERRO_LOGIN }); // no CNPJ yet
+    expect(await c.definirCnpj(u.id, CNPJ)).toEqual({ ok: "CNPJ salvo.", cnpj: "68631511000145" });
     expect(await c.entrarComSenha("68631511000145", SENHA, "1.1.1.1")).toEqual({ userId: u.id });
     expect(await c.entrarComSenha(CNPJ, SENHA, "1.1.1.1")).toEqual({ userId: u.id });
   });
@@ -98,7 +100,7 @@ describe.skipIf(!url)("contas", () => {
 
   it("does not create a second account or touch the password when the e-mail is taken", async () => {
     const antes = await user("nova@empresa.com.br");
-    expect(await c.criarConta({ email: "nova@empresa.com.br", senha: "outra senha qualquer", cnpj: CNPJ2 })).toEqual({ ok: "nova@empresa.com.br" });
+    expect(await c.criarConta({ email: "nova@empresa.com.br", senha: "outra senha qualquer" })).toEqual({ ok: "nova@empresa.com.br" });
     expect(enviados[0].subject).toBe("Seu link de acesso ao Vencedital");
     expect(enviados[0].text).toMatch(/já tem uma conta/);
     const depois = await user("nova@empresa.com.br");
@@ -106,38 +108,32 @@ describe.skipIf(!url)("contas", () => {
     expect(depois.cnpj).toBe(antes.cnpj);
   });
 
-  it("creates the account without a CNPJ that a confirmed account already holds, and says so only by e-mail", async () => {
-    expect(await c.criarConta({ email: "outro@empresa.com.br", senha: SENHA, cnpj: CNPJ })).toEqual({ ok: "outro@empresa.com.br" });
+  it("keeps one account per CNPJ", async () => {
+    const { userId } = await contaConfirmada("outro@empresa.com.br");
+    expect((await c.definirCnpj(userId, CNPJ)).error).toMatch(/uma conta por empresa/);
     expect((await user("outro@empresa.com.br")).cnpj).toBeNull();
-    expect(enviados[0].text).toMatch(/68\.631\.511\/0001-45 já está em outra conta/);
+    expect(await c.definirCnpj(userId, CNPJ2)).toEqual({ ok: "CNPJ salvo.", cnpj: "12ABC34501DE35" });
+    expect((await c.definirCnpj(userId, "12.345.678/0001-00")).error).toMatch(/CNPJ inválido/);
   });
 
   it("validates input before anything else", async () => {
-    expect(await c.criarConta({ email: "x", senha: SENHA, cnpj: CNPJ2 })).toEqual({ error: "E-mail inválido." });
-    expect((await c.criarConta({ email: "a@b.com", senha: SENHA, cnpj: "12.345.678/0001-00" })).error).toMatch(/CNPJ inválido/);
-    expect((await c.criarConta({ email: "a@b.com", senha: "curta", cnpj: CNPJ2 })).error).toMatch(/8 caracteres/);
+    expect(await c.criarConta({ email: "x", senha: SENHA })).toEqual({ error: "E-mail inválido." });
+    expect((await c.criarConta({ email: "a@b.com", senha: "curta" })).error).toMatch(/8 caracteres/);
     expect(enviados).toHaveLength(0);
   });
 
   it("lets a later sign-up replace an unconfirmed one; only the newest link confirms", async () => {
-    await c.criarConta({ email: "disputa@empresa.com.br", senha: "senha do primeiro", cnpj: CNPJ2 });
+    await c.criarConta({ email: "disputa@empresa.com.br", senha: "senha do primeiro" });
     const primeiro = ultimoToken();
-    await c.criarConta({ email: "disputa@empresa.com.br", senha: "senha do segundo", cnpj: CNPJ2 });
+    await c.criarConta({ email: "disputa@empresa.com.br", senha: "senha do segundo" });
     expect(await c.confirmarToken(primeiro)).toBeNull();
     expect(await c.confirmarToken(ultimoToken())).not.toBeNull();
     expect((await c.entrarComSenha("disputa@empresa.com.br", "senha do primeiro", null)).hasOwnProperty("error")).toBe(true);
     expect(await c.entrarComSenha("disputa@empresa.com.br", "senha do segundo", null)).toHaveProperty("userId");
   });
 
-  it("releases a CNPJ held only by an unconfirmed sign-up", async () => {
-    await c.criarConta({ email: "squat@empresa.com.br", senha: SENHA, cnpj: "11.222.333/0001-81" });
-    await contaConfirmada("dono@empresa.com.br", "11.222.333/0001-81");
-    expect((await user("squat@empresa.com.br")).cnpj).toBeNull();
-    expect((await user("dono@empresa.com.br")).cnpj).toBe("11222333000181");
-  });
-
   it("drops a password typed at an unconfirmed sign-up when the inbox owner comes in by magic link", async () => {
-    await c.criarConta({ email: "vitima@empresa.com.br", senha: "senha de um estranho", cnpj: "45.997.418/0001-53" });
+    await c.criarConta({ email: "vitima@empresa.com.br", senha: "senha de um estranho" });
     expect((await c.pedirLinkAcesso("vitima@empresa.com.br")).ok).toMatch(/Enviamos um link/);
     expect(await c.confirmarToken(ultimoToken())).toHaveProperty("novo", true);
     const u = await user("vitima@empresa.com.br");
@@ -204,10 +200,11 @@ describe.skipIf(!url)("contas", () => {
     expect((await c.trocarSenha(id, "minha primeira senha", "outra senha boa", desde)).ok).toMatch(/Senha trocada/);
   });
 
-  it("adds a CNPJ from the account page unless a confirmed account holds it", async () => {
+  it("adds a CNPJ to a legacy account unless another account holds it", async () => {
     const { id } = await user("usou@link.com");
-    expect((await c.definirCnpj(id, CNPJ)).error).toMatch(/já está em outra conta/);
-    expect(await c.definirCnpj(id, "06.990.590/0001-23")).toEqual({ ok: "CNPJ salvo." });
+    expect((await c.definirCnpj(id, CNPJ)).error).toMatch(/já tem uma conta/);
+    expect(await c.definirCnpj(id, "06.990.590/0001-23")).toEqual({ ok: "CNPJ salvo.", cnpj: "06990590000123" });
+    expect(await c.definirCnpj(id, "06990590000123")).toEqual({ ok: "CNPJ salvo.", cnpj: "06990590000123" }); // saving again is fine
     expect(await c.entrarComSenha("06990590000123", "outra senha boa", null)).toEqual({ userId: id });
   });
 });
