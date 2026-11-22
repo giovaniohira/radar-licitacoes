@@ -1,4 +1,7 @@
 import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "node:crypto";
+import { normalizeCnpj } from "./cnpj";
+
+export { formatCnpj, normalizeCnpj } from "./cnpj";
 
 export const SESSION_COOKIE = "radar_sessao";
 export const SESSION_DAYS = 30;
@@ -98,29 +101,6 @@ export async function verificarSenha(senha: string, armazenado: string | null | 
   const esperado = Buffer.from(key, "base64url");
   const got = await scryptAsync(senha.slice(0, SENHA_MAX), Buffer.from(salt, "base64url"), esperado.length, { N: Number(n), r: Number(r), p: Number(p) });
   return timingSafeEqual(esperado, got) && armazenado != null;
-}
-
-// --- CNPJ, including the alphanumeric format the Receita Federal issues from July 2026 (IN RFB 2.229/2024). ---
-
-function dv(base: string): number {
-  // Character value is its ASCII code minus 48: digits keep their value, A=17 … Z=42.
-  let soma = 0;
-  for (let i = 0; i < base.length; i++) soma += (base.charCodeAt(i) - 48) * [2, 3, 4, 5, 6, 7, 8, 9][(base.length - 1 - i) % 8];
-  const resto = soma % 11;
-  return resto < 2 ? 0 : 11 - resto;
-}
-
-/** 14 characters, uppercase, no punctuation, check digits valid; or null. */
-export function normalizeCnpj(input: string): string | null {
-  const c = input.replace(/[\s./-]/g, "").toUpperCase();
-  if (!/^[0-9A-Z]{12}[0-9]{2}$/.test(c) || /^(.)\1+$/.test(c)) return null;
-  const d1 = dv(c.slice(0, 12));
-  const d2 = dv(c.slice(0, 12) + d1);
-  return c.endsWith(`${d1}${d2}`) ? c : null;
-}
-
-export function formatCnpj(c: string): string {
-  return `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`;
 }
 
 export type Identificador = { tipo: "email"; valor: string } | { tipo: "cnpj"; valor: string };

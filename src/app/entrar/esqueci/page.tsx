@@ -10,10 +10,10 @@ export default function Esqueci() {
     <AuthLayout>
       <div>
         <h1>Esqueci a senha</h1>
-        <p>Digite seu e-mail ou CNPJ. Mandamos um link para você criar uma senha nova. Serve também para quem sempre entrou só pelo link.</p>
+        <p>Mandamos um link para criar uma senha nova. Vale 30 minutos. Serve também para quem sempre entrou só pelo link.</p>
       </div>
       <EsqueciForm />
-      <p className="small subtle">
+      <p className="auth-alt">
         <Link href="/entrar">Voltar para entrar</Link>
       </p>
     </AuthLayout>

@@ -110,14 +110,18 @@ describe.skipIf(!url)("contas", () => {
 
   it("keeps one account per CNPJ", async () => {
     const { userId } = await contaConfirmada("outro@empresa.com.br");
-    expect((await c.definirCnpj(userId, CNPJ)).error).toMatch(/uma conta por empresa/);
+    expect((await c.definirCnpj(userId, CNPJ)).error).toBe(c.ERRO_CNPJ_USADO);
+    expect(await c.cnpjDeOutraConta(userId, "68631511000145")).toBe(true);
+    expect(await c.cnpjDeOutraConta(userId, "06990590000123")).toBe(false);
     expect((await user("outro@empresa.com.br")).cnpj).toBeNull();
     expect(await c.definirCnpj(userId, CNPJ2)).toEqual({ ok: "CNPJ salvo.", cnpj: "12ABC34501DE35" });
-    expect((await c.definirCnpj(userId, "12.345.678/0001-00")).error).toMatch(/CNPJ inválido/);
+    expect((await c.definirCnpj(userId, "12.345.678/0001-00")).error).toMatch(/não existe/);
   });
 
   it("validates input before anything else", async () => {
-    expect(await c.criarConta({ email: "x", senha: SENHA })).toEqual({ error: "E-mail inválido." });
+    expect(await c.criarConta({ email: "x", senha: SENHA })).toEqual({ error: "Confira o e-mail: falta o @.", campo: "email" });
+    expect(await c.criarConta({ email: "compras@padaria", senha: SENHA })).toEqual({ error: "Confira o e-mail: falta o final, como .com.br.", campo: "email" });
+    expect(await c.criarConta({ email: "a@b.com", senha: "curta" })).toMatchObject({ campo: "senha" });
     expect((await c.criarConta({ email: "a@b.com", senha: "curta" })).error).toMatch(/8 caracteres/);
     expect(enviados).toHaveLength(0);
   });
@@ -134,7 +138,7 @@ describe.skipIf(!url)("contas", () => {
 
   it("drops a password typed at an unconfirmed sign-up when the inbox owner comes in by magic link", async () => {
     await c.criarConta({ email: "vitima@empresa.com.br", senha: "senha de um estranho" });
-    expect((await c.pedirLinkAcesso("vitima@empresa.com.br")).ok).toMatch(/Enviamos um link/);
+    expect((await c.pedirLinkAcesso("vitima@empresa.com.br"))).toEqual({ ok: c.OK_LINK });
     expect(await c.confirmarToken(ultimoToken())).toHaveProperty("novo", true);
     const u = await user("vitima@empresa.com.br");
     expect(u.senha_hash).toBeNull();
@@ -143,11 +147,15 @@ describe.skipIf(!url)("contas", () => {
 
   it("locks an account after 5 failures, even for the right password, and counts per IP too", async () => {
     for (let i = 0; i < c.LIMITE_FALHAS_CONTA; i++) await c.entrarComSenha("nova@empresa.com.br", `errada ${i}`, `9.9.9.${i}`);
-    expect(await c.entrarComSenha("nova@empresa.com.br", SENHA, "8.8.8.8")).toEqual({ error: c.ERRO_BLOQUEIO });
+    const bloqueio = await c.entrarComSenha("nova@empresa.com.br", SENHA, "8.8.8.8");
+    expect(bloqueio).toMatchObject({ error: c.ERRO_BLOQUEIO });
+    // Opens when the 5th most recent failure leaves the 15-minute window: just under 15 minutes from now.
+    expect((bloqueio as { espera: number }).espera).toBeGreaterThan(14 * 60);
+    expect((bloqueio as { espera: number }).espera).toBeLessThanOrEqual(15 * 60);
     expect(await c.entrarComSenha(CNPJ, SENHA, "8.8.8.8")).toHaveProperty("userId"); // separate key: e-mail vs CNPJ
     await pool().query("delete from tentativas_login");
     for (let i = 0; i < c.LIMITE_FALHAS_IP; i++) await c.entrarComSenha(`alvo${i}@empresa.com.br`, "errada", "7.7.7.7");
-    expect(await c.entrarComSenha("nova@empresa.com.br", SENHA, "7.7.7.7")).toEqual({ error: c.ERRO_BLOQUEIO });
+    expect(await c.entrarComSenha("nova@empresa.com.br", SENHA, "7.7.7.7")).toMatchObject({ error: c.ERRO_BLOQUEIO });
     expect(await c.entrarComSenha("nova@empresa.com.br", SENHA, "6.6.6.6")).toHaveProperty("userId");
   });
 
@@ -159,18 +167,40 @@ describe.skipIf(!url)("contas", () => {
     expect(enviados[0].to).toBe("nova@empresa.com.br");
     expect(enviados[0].text).toContain("/entrar/nova-senha?token=");
     const token = ultimoToken();
-    expect(await c.tokenSenhaValido(token)).toBe(true);
+    expect(await c.tokenSenhaValido(token)).toBe("nova@empresa.com.br");
     expect(await c.confirmarToken(token)).toBeNull(); // a reset link never signs in by itself
 
     const desde = Math.floor(Date.now() / 1000);
     expect((await c.redefinirSenha(token, "curta", desde)).hasOwnProperty("error")).toBe(true);
-    expect(await c.tokenSenhaValido(token)).toBe(true); // a rejected password does not burn the link
+    expect(await c.tokenSenhaValido(token)).toBe("nova@empresa.com.br"); // a rejected password does not burn the link
     const r = await c.redefinirSenha(token, "senha novinha 2026", desde);
     expect(r).toHaveProperty("userId");
     expect(await c.redefinirSenha(token, "outra senha nova", desde)).toHaveProperty("error");
     expect(await c.entrarComSenha("nova@empresa.com.br", SENHA, null)).toEqual({ error: c.ERRO_LOGIN });
     expect(await c.entrarComSenha("nova@empresa.com.br", "senha novinha 2026", null)).toHaveProperty("userId");
     expect(Math.floor((await user("nova@empresa.com.br")).sessoes_desde.getTime() / 1000)).toBe(desde);
+  });
+
+  it("sends the magic link by CNPJ to the account's e-mail, and nothing for an unknown CNPJ", async () => {
+    expect(await c.pedirLinkAcesso(CNPJ)).toEqual({ ok: c.OK_LINK });
+    expect(enviados.map((m) => m.to)).toEqual(["nova@empresa.com.br"]);
+    expect(await c.pedirLinkAcesso("33.000.167/0001-01")).toEqual({ ok: c.OK_LINK });
+    expect(enviados).toHaveLength(1);
+    expect((await c.pedirLinkAcesso("33.000.167/0001-00")).error).toBeTruthy();
+  });
+
+  it("reads the supplier's history from the PNCP contracts", async () => {
+    const db = pool();
+    const ins = (id: string, uf: string, objeto: string) =>
+      db.query(`insert into contratos (id, orgao_cnpj, orgao, uf, fornecedor_ni, objeto, raw) values ($1, '1', 'Órgão', $2, '11222333000181', $3, '{}')`, [id, uf, objeto]);
+    await ins("c1", "RO", "Aquisição de gêneros alimentícios para merenda escolar");
+    await ins("c2", "AM", "Fornecimento de pães e gêneros alimentícios");
+    await ins("c3", "RO", "Merenda escolar: pães e bolos");
+    expect(await c.historicoFornecedor("11222333000181")).toEqual({
+      ufs: ["RO", "AM"],
+      objetos: expect.arrayContaining(["Merenda escolar: pães e bolos"]),
+    });
+    expect(await c.historicoFornecedor("06990590000123")).toEqual({ ufs: [], objetos: [] });
   });
 
   it("does not accept a sign-in link as a reset link", async () => {

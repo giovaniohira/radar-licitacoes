@@ -15,15 +15,16 @@ async function Formulario({ searchParams }: PageProps<"/criar-conta">) {
 
 export default function CriarConta(props: PageProps<"/criar-conta">) {
   return (
-    <AuthLayout>
+    <AuthLayout passo={0}>
       <div>
-        <h1>Criar conta</h1>
-        <p>{DIAS_TESTE} dias grátis, sem cartão. Depois de criar, confirme pelo link que chega no seu e-mail.</p>
+        <p className="kicker">Teste grátis · {DIAS_TESTE} dias</p>
+        <h1>Crie sua conta</h1>
+        <p>Leva um minuto. O CNPJ vem depois, para já montar seu alerta.</p>
       </div>
       <Suspense fallback={<CadastroForm email="" />}>
         <Formulario {...props} />
       </Suspense>
-      <p className="small subtle" style={{ lineHeight: 1.5 }}>
+      <p className="auth-alt">
         Já tem conta? <Link href="/entrar">Entrar</Link>
       </p>
     </AuthLayout>

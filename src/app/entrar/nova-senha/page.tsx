@@ -11,26 +11,36 @@ export const metadata: Metadata = { title: "Nova senha", robots: { index: false 
 async function Conteudo({ searchParams }: PageProps<"/entrar/nova-senha">) {
   const { token } = await searchParams;
   const t = typeof token === "string" ? token : "";
-  if (!(await tokenSenhaValido(t))) {
+  const email = await tokenSenhaValido(t);
+  if (!email) {
     return (
       <>
-        <div className="notice">Esse link expirou ou já foi usado.</div>
-        <Link href="/entrar/esqueci" className="btn btn-primary">
-          Pedir um novo link
+        <div>
+          <h1>Link vencido</h1>
+          <p>Esse link expirou ou já foi usado. Peça outro: ele chega em instantes.</p>
+        </div>
+        <Link href="/entrar/esqueci" className="btn btn-primary btn-block">
+          Pedir um link novo
         </Link>
       </>
     );
   }
-  return <NovaSenhaForm token={t} />;
+  return (
+    <>
+      <div>
+        <h1>Crie uma senha nova</h1>
+        <p>
+          Para <b>{email}</b>. Depois você já entra, e os outros aparelhos são desconectados.
+        </p>
+      </div>
+      <NovaSenhaForm token={t} email={email} />
+    </>
+  );
 }
 
 export default function NovaSenha(props: PageProps<"/entrar/nova-senha">) {
   return (
     <AuthLayout>
-      <div>
-        <h1>Criar nova senha</h1>
-        <p>Depois de salvar, você entra direto e os outros aparelhos são desconectados.</p>
-      </div>
       <Suspense>
         <Conteudo {...props} />
       </Suspense>

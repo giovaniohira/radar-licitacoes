@@ -1,8 +1,17 @@
 import type { ReactNode } from "react";
+import { DIAS_TESTE } from "@/lib/empresa";
 import { Logo } from "./icons";
 
-/** Split sign-in layout: the form on the left, what happens next on the right. */
-export function AuthLayout({ children }: { children: ReactNode }) {
+const CADASTRO = ["Crie sua conta com e-mail e senha.", "Confirme o e-mail pelo link que mandamos.", "Diga o CNPJ: o ramo e os estados vêm preenchidos."];
+const ENTRAR = ["Entre com o e-mail ou o CNPJ da empresa.", "Sem senha à mão? Receba um link no e-mail.", "O Hoje mostra o que chegou e o que vence."];
+
+/**
+ * Split sign-in layout: the form on the left, the ink panel on the right (hidden on phones).
+ * `passo` turns the panel into the sign-up progress (0 = criar conta, 1 = confirmar e-mail); without it, the sign-in panel.
+ */
+export function AuthLayout({ children, passo }: { children: ReactNode; passo?: number }) {
+  const cadastro = passo !== undefined;
+  const itens = cadastro ? CADASTRO : ENTRAR;
   return (
     <main id="conteudo" className="auth">
       <section className="auth-main">
@@ -12,18 +21,16 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         </div>
       </section>
       <aside className="auth-aside">
-        <h2>Seu primeiro alerta em poucos minutos.</h2>
+        <h2>{cadastro ? "Seu primeiro alerta em 3 passos." : "Os editais do seu ramo, todo dia às 7h."}</h2>
         <ol>
-          <li>
-            <span>1</span>Informe o CNPJ: já marcamos seu ramo e seu estado.
-          </li>
-          <li>
-            <span>2</span>Ajuste o que você vende, os estados e o tamanho de contrato.
-          </li>
-          <li>
-            <span>3</span>Todo dia às 7h, os editais novos chegam no seu e-mail.
-          </li>
+          {itens.map((t, i) => (
+            <li key={t} className={cadastro ? (i < passo ? "feito" : i === passo ? "atual" : undefined) : undefined} aria-current={cadastro && i === passo ? "step" : undefined}>
+              <span>{i + 1}</span>
+              {t}
+            </li>
+          ))}
         </ol>
+        {cadastro && <p className="nota">{DIAS_TESTE} dias grátis, sem cartão. Um teste por CNPJ.</p>}
       </aside>
     </main>
   );

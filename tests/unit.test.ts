@@ -17,7 +17,8 @@ import {
   verifySession,
 } from "@/lib/auth";
 import { AVISO_DIGEST, renderDigest, type Alert } from "@/lib/alerts";
-import { consultarCnpj, setoresDoCnae } from "@/lib/cnpj-publico";
+import { mascaraCnpj } from "@/lib/cnpj";
+import { consultarCnpj, formatCnae, palavrasDoHistorico, setoresDoCnae, setoresSugeridos } from "@/lib/cnpj-publico";
 import { quemSomos } from "@/lib/empresa";
 import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
@@ -430,6 +431,37 @@ describe("quem ganhou: palavras do objeto", () => {
 });
 
 describe("CNPJ public data", () => {
+  it("keeps the city, opening year and activity", async () => {
+    const f = (async () =>
+      new Response(JSON.stringify({ razao_social: "PADARIA X LTDA", municipio: "PORTO VELHO", uf: "RO", data_inicio_atividade: "2014-03-02", cnae_fiscal_descricao: "Fabricação de produtos de panificação", cnae_fiscal: 1091102 }))) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", f)).toMatchObject({ municipio: "PORTO VELHO", abertura: 2014, atividade: "Fabricação de produtos de panificação", cnaes: ["1091102"] });
+    expect(formatCnae("1091102")).toBe("1091-1/02");
+  });
+  it("picks words that repeat across the contracts a company won", () => {
+    const objetos = [
+      "Aquisição de gêneros alimentícios para a merenda escolar",
+      "Registro de preços para fornecimento de pães e gêneros alimentícios",
+      "Merenda escolar: pães, bolos e biscoitos",
+      "Contratação de empresa especializada em coffee break",
+    ];
+    expect(palavrasDoHistorico(objetos)).toEqual(["alimentícios", "escolar", "gêneros"]);
+    expect(palavrasDoHistorico(objetos, 5)).toEqual(["alimentícios", "escolar", "gêneros", "merenda"]);
+    expect(palavrasDoHistorico(["Uma compra só"])).toEqual([]);
+  });
+  it("suggests the strongest sectors: main CNAE and the words of the company's own contracts", () => {
+    // Hospital distributor: a secondary CNAE also matches "limpeza", but its contracts say medicamentos.
+    expect(setoresSugeridos(["4645101", "4649408"], ["medicamentos", "suplementos"])).toEqual(["saude"]);
+    // Mixed distributor: no main match; the most frequent contract word decides the order.
+    expect(setoresSugeridos(["8211300", "4647801", "4639701", "4649408"], ["expediente", "escolar", "limpeza"])).toEqual(["escritorio", "alimentos"]);
+    // No history: CNAE alone, main first, a secondary one next to it.
+    expect(setoresSugeridos(["4751201", "8121400"], [])).toEqual(["ti", "limpeza"]);
+    expect(setoresSugeridos([], [])).toEqual([]);
+  });
+  it("masks a CNPJ while it is typed", () => {
+    expect(mascaraCnpj("6863")).toBe("68.63");
+    expect(mascaraCnpj("68631511000145")).toBe("68.631.511/0001-45");
+    expect(mascaraCnpj("12abc34501de35xx")).toBe("12.ABC.345/01DE-35");
+  });
   it("maps CNAE classes to onboarding sectors, main activity first", () => {
     expect(setoresDoCnae(["8121400", "4751201"])).toEqual(["limpeza", "ti"]);
     expect(setoresDoCnae(["6319400", "4751201", "6201501"])).toEqual(["ti"]);
@@ -439,7 +471,7 @@ describe("CNPJ public data", () => {
   it("reads state and CNAEs, and returns null on any failure", async () => {
     const ok = (async () =>
       new Response(JSON.stringify({ razao_social: "EMPRESA X LTDA", uf: "RO", cnae_fiscal: 4751201, cnaes_secundarios: [{ codigo: 0 }, { codigo: 8121400 }] }))) as typeof fetch;
-    expect(await consultarCnpj("68631511000145", ok)).toEqual({ razaoSocial: "EMPRESA X LTDA", uf: "RO", cnaes: ["4751201", "8121400"] });
+    expect(await consultarCnpj("68631511000145", ok)).toEqual({ razaoSocial: "EMPRESA X LTDA", municipio: null, uf: "RO", abertura: null, atividade: null, cnaes: ["4751201", "8121400"] });
     const notFound = (async () => new Response("{}", { status: 404 })) as typeof fetch;
     expect(await consultarCnpj("68631511000145", notFound)).toBeNull();
     // First source refuses, the fallback answers.
@@ -448,7 +480,7 @@ describe("CNPJ public data", () => {
       urls.push(u);
       return urls.length === 1 ? new Response("Forbidden", { status: 403 }) : new Response(JSON.stringify({ uf: "SP", cnae_fiscal: "6201-5/01" }));
     }) as typeof fetch;
-    expect(await consultarCnpj("06990590000123", fallback)).toEqual({ razaoSocial: "", uf: "SP", cnaes: ["6201501"] });
+    expect(await consultarCnpj("06990590000123", fallback)).toEqual({ razaoSocial: "", municipio: null, uf: "SP", abertura: null, atividade: null, cnaes: ["6201501"] });
     expect(urls[1]).toBe("https://minhareceita.org/06990590000123");
     const down = (async () => {
       throw new Error("timeout");

@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useId, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
 import Form from "next/form";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
-import { entrar, pedirLink, reenviarVerificacao } from "../actions/auth";
+import { entrar, pedirLink } from "../actions/auth";
 
 /** Terms acceptance next to every sign-in and sign-up button (docs/empresa/avisos-produto.md §3). */
 export function Aceite({ verbo = "entrar" }: { verbo?: string }) {
@@ -15,146 +15,210 @@ export function Aceite({ verbo = "entrar" }: { verbo?: string }) {
   );
 }
 
-/** Password input with a show/hide toggle: typing blind on a phone is the main source of "wrong password". */
-export function CampoSenha({ name = "senha", label = "Senha", nova = false, autoFocus = false }: { name?: string; label?: string; nova?: boolean; autoFocus?: boolean }) {
+export const Seta = () => <Icon name="arrowRight" size={15} className="arr" />;
+
+/**
+ * "mm:ss" left until `ate` (epoch ms), ticking every second; null when it is over. The clock is read only after
+ * mounting: prerendering a client component may not depend on the current time.
+ */
+export function useContagem(ate: number | null): string | null {
+  const [agora, setAgora] = useState<number | null>(null);
+  useEffect(() => {
+    if (!ate) return;
+    const tick = () => setAgora(Date.now());
+    const primeiro = setTimeout(tick, 0);
+    const t = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(primeiro);
+      clearInterval(t);
+    };
+  }, [ate]);
+  if (!ate || agora === null || ate <= agora) return null;
+  const s = Math.ceil((ate - agora) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Password input with a "Mostrar/Ocultar" toggle inside the field (typing blind on a phone is the main source of
+ * "wrong password"). A div, not a <label>: a label around the toggle and the link would put their text in the input's name.
+ */
+export function CampoSenha({
+  name = "senha",
+  label = "Senha",
+  nova = false,
+  autoFocus = false,
+  extra,
+  erro,
+  disabled,
+  inputRef,
+}: {
+  name?: string;
+  label?: string;
+  nova?: boolean;
+  autoFocus?: boolean;
+  extra?: ReactNode;
+  erro?: string;
+  disabled?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
+}) {
   const [ver, setVer] = useState(false);
   const id = useId();
-  // A div, not a <label>: a label wrapping the toggle button would name the button instead of the input.
   return (
     <div className="field">
-      <span className="row" style={{ justifyContent: "space-between" }}>
+      <span className="field-top">
         <label htmlFor={id}>{label}</label>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => setVer((v) => !v)}
-          aria-pressed={ver}
-          aria-label={ver ? "Esconder senha" : "Mostrar senha"}
-          style={{ padding: "0 6px", height: "auto" }}
-        >
-          {ver ? "Esconder" : "Mostrar"}
+        {extra}
+      </span>
+      <span className="pw">
+        <input
+          id={id}
+          ref={inputRef}
+          className="input input-lg"
+          name={name}
+          type={ver ? "text" : "password"}
+          required
+          minLength={nova ? 8 : undefined}
+          maxLength={200}
+          autoComplete={nova ? "new-password" : "current-password"}
+          placeholder={nova ? "Mínimo de 8 caracteres" : undefined}
+          autoFocus={autoFocus}
+          disabled={disabled}
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? `${id}-erro` : undefined}
+        />
+        <button type="button" onClick={() => setVer((v) => !v)} aria-pressed={ver} aria-label={ver ? "Ocultar senha" : "Mostrar senha"} disabled={disabled}>
+          {ver ? "Ocultar" : "Mostrar"}
         </button>
       </span>
+      {erro && (
+        <span className="erro" id={`${id}-erro`}>
+          {erro}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CampoIdentificador({ valor, disabled, autoFocus }: { valor?: string; disabled?: boolean; autoFocus?: boolean }) {
+  return (
+    <label className="field">
+      E-mail ou CNPJ
       <input
-        id={id}
         className="input input-lg"
-        name={name}
-        type={ver ? "text" : "password"}
+        name="identificador"
         required
-        minLength={nova ? 8 : undefined}
-        maxLength={200}
-        autoComplete={nova ? "new-password" : "current-password"}
+        inputMode="text"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
+        defaultValue={valor}
+        key={valor}
+        disabled={disabled}
         autoFocus={autoFocus}
       />
-      {nova && <span className="hint">Pelo menos 8 caracteres.</span>}
-    </div>
+    </label>
   );
 }
 
-/** "Check your inbox" after sign-up or after a password sign-in on an unconfirmed account, with a resend button. */
-export function ConfirmeEmail({ email }: { email: string }) {
-  const [state, action, pending] = useActionState(reenviarVerificacao, null);
-  return (
-    <div className="stack">
-      <div role="status" className="sent">
-        <Icon name="check" size={18} />
-        <span>
-          <strong>Falta só confirmar seu e-mail.</strong> Enviamos um link para <b>{email}</b>. Abra o e-mail e clique em “Confirmar e-mail” para entrar.
-        </span>
-      </div>
-      <form action={action} className="row" style={{ gap: 8, alignItems: "center" }}>
-        <input type="hidden" name="email" value={email} />
-        <span className="small subtle">Não chegou? Confira o spam ou</span>
-        <button type="submit" className="btn btn-ghost btn-sm" disabled={pending}>
-          {pending ? "Enviando…" : "envie de novo"}
-        </button>
-      </form>
-      {state?.ok && <div className="notice ok">{state.ok}</div>}
-      {state?.error && <div className="notice">{state.error}</div>}
-    </div>
-  );
-}
-
-/** Magic link: no password needed. Also creates the account for a new address, as before. */
-export function LinkForm({ email = "" }: { email?: string }) {
+/** "Receber link": the same page with the password swapped out. One field, one button. */
+function LinkForm({ valor, voltar }: { valor?: string; voltar: () => void }) {
   const [state, action, pending] = useActionState(pedirLink, null);
-  if (state?.ok) {
-    return (
-      <div role="status" className="sent">
-        <Icon name="check" size={18} />
-        <span>
-          <strong>Link enviado.</strong> {state.ok} Abra o e-mail neste aparelho e clique em “Entrar”.
-        </span>
-      </div>
-    );
-  }
   return (
-    <form action={action} className="stack">
-      <label className="field">
-        E-mail
-        <input className="input input-lg" name="email" type="email" required autoComplete="email" defaultValue={email} placeholder="voce@empresa.com.br" />
-      </label>
-      <button type="submit" className="btn btn-primary" disabled={pending}>
-        {pending ? "Enviando…" : "Receber link de acesso"}
-      </button>
-      {state?.error && <div className="notice">{state.error}</div>}
-      <Aceite />
-    </form>
-  );
-}
-
-/** Sign in with e-mail or CNPJ and password; one click switches to the magic link. */
-export function LoginForm() {
-  const [state, action, pending] = useActionState(entrar, null);
-  const [modo, setModo] = useState<"senha" | "link">("senha");
-  if (state?.pendente) return <ConfirmeEmail email={state.pendente} />;
-  if (modo === "link") {
-    return (
-      <div className="stack">
-        <LinkForm email={state?.identificador?.includes("@") ? state.identificador : ""} />
-        <button type="button" className="btn btn-ghost" onClick={() => setModo("senha")}>
-          Entrar com senha
-        </button>
+    <>
+      <div>
+        <h1>Entrar com link</h1>
+        <p>Mandamos um link para o e-mail da conta. Vale 20 minutos.</p>
       </div>
-    );
-  }
-  return (
-    <div className="stack">
-      <form action={action} className="stack">
-        <label className="field">
-          E-mail ou CNPJ
-          <input
-            className="input input-lg"
-            name="identificador"
-            required
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            defaultValue={state?.identificador}
-            key={state?.identificador}
-            placeholder="voce@empresa.com.br ou 00.000.000/0000-00"
-          />
-        </label>
-        <CampoSenha />
-        <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? "Entrando…" : "Entrar"}
+      <form action={action} className="stack" style={{ gap: 16 }}>
+        <CampoIdentificador valor={valor} autoFocus={!valor} />
+        <button type="submit" className="btn btn-primary btn-block" disabled={pending}>
+          {pending ? "Enviando…" : "Receber link"} <Seta />
         </button>
         {state?.error && (
-          <div className="notice">
-            {state.error} Se você sempre entrou pelo link no e-mail, use “Entrar sem senha” ou crie uma senha em “Esqueci a senha”.
+          <div className="notice" role="alert">
+            {state.error}
           </div>
         )}
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <Link href="/entrar/esqueci" className="small">
-            Esqueci a senha
-          </Link>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setModo("link")}>
-            Entrar sem senha, com link no e-mail
-          </button>
-        </div>
         <Aceite />
       </form>
-    </div>
+      {state?.ok && (
+        <div role="status" className="sent">
+          <Icon name="check" size={18} />
+          <span>
+            <strong>Link enviado.</strong> {state.ok}
+          </span>
+        </div>
+      )}
+      <p className="auth-alt">
+        <button type="button" className="link-btn" onClick={voltar}>
+          Voltar para entrar com senha
+        </button>
+      </p>
+    </>
+  );
+}
+
+/** Sign in with e-mail or CNPJ and password; the magic link is one click away and takes over during a lockout. */
+export function LoginForm({ link = false }: { link?: boolean }) {
+  const [state, action, pending] = useActionState(entrar, null);
+  const [modo, setModo] = useState<"senha" | "link">(link ? "link" : "senha");
+  const senha = useRef<HTMLInputElement>(null);
+  const contagem = useContagem(state?.ate ?? null);
+  const bloqueado = !!contagem;
+
+  // After a failed attempt the form resets: the password is empty again, so put the cursor there.
+  useEffect(() => {
+    if (state?.error && !state.ate) senha.current?.focus();
+  }, [state]);
+
+  if (modo === "link") return <LinkForm valor={state?.identificador} voltar={() => setModo("senha")} />;
+
+  const botaoLink = (primario: boolean) => (
+    <button type="button" className={`btn btn-block ${primario ? "btn-primary" : "btn-lg"}`} onClick={() => setModo("link")}>
+      <Icon name="mail" size={16} /> Receber link de acesso por e-mail
+    </button>
+  );
+
+  return (
+    <>
+      <div>
+        <h1>Entrar</h1>
+        <p>Com o e-mail ou o CNPJ da empresa.</p>
+      </div>
+      {state?.error && (
+        <div className="notice" role="alert">
+          {state.error}
+        </div>
+      )}
+      {bloqueado && (
+        <>
+          {botaoLink(true)}
+          <p className="ou">ou</p>
+        </>
+      )}
+      <form action={action} className="stack" style={{ gap: 16, opacity: bloqueado ? 0.55 : undefined }}>
+        <CampoIdentificador valor={state?.identificador} disabled={bloqueado} autoFocus={!state?.identificador} />
+        <CampoSenha inputRef={senha} disabled={bloqueado} extra={bloqueado ? undefined : <Link href="/entrar/esqueci">Esqueci a senha</Link>} />
+        {bloqueado ? (
+          <button type="button" className="btn btn-block" disabled>
+            Entrar <time className="xs" style={{ fontFamily: "var(--mono)" }}>em {contagem}</time>
+          </button>
+        ) : (
+          <button type="submit" className="btn btn-primary btn-block" disabled={pending}>
+            {pending ? "Entrando…" : "Entrar"} <Seta />
+          </button>
+        )}
+      </form>
+      {!bloqueado && (
+        <>
+          <p className="ou">ou</p>
+          {botaoLink(false)}
+          <p className="auth-alt">
+            Ainda não tem conta? <Link href="/criar-conta">Criar conta grátis</Link>
+          </p>
+        </>
+      )}
+    </>
   );
 }
 

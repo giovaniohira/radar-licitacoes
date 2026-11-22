@@ -2,15 +2,17 @@
 
 import { useActionState, useState } from "react";
 import { criarConta } from "../actions/auth";
-import { Aceite, CampoSenha, ConfirmeEmail } from "../entrar/LoginForm";
+import { Aceite, CampoSenha, Seta } from "../entrar/LoginForm";
 
+/** E-mail and password only; the CNPJ comes in the onboarding. On success the action moves on to /criar-conta/confirme. */
 export function CadastroForm({ email: inicial }: { email: string }) {
   const [state, action, pending] = useActionState(criarConta, null);
-  // Kept across a failed submit, which would otherwise reset the uncontrolled inputs.
+  // Kept across a failed submit, which would otherwise reset the uncontrolled input.
   const [email, setEmail] = useState(inicial);
-  if (state?.ok) return <ConfirmeEmail email={state.ok} />;
+  const erroEmail = state?.campo === "email" ? state.error : undefined;
+  const erroSenha = state?.campo === "senha" ? state.error : undefined;
   return (
-    <form action={action} className="stack">
+    <form action={action} className="stack" style={{ gap: 16 }} noValidate>
       <label className="field">
         E-mail de trabalho
         <input
@@ -23,13 +25,25 @@ export function CadastroForm({ email: inicial }: { email: string }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="voce@empresa.com.br"
           autoFocus={!inicial}
+          aria-invalid={erroEmail ? true : undefined}
+          aria-describedby={erroEmail ? "erro-email" : undefined}
         />
+        {erroEmail && (
+          <span className="erro" id="erro-email">
+            {erroEmail}
+          </span>
+        )}
       </label>
-      <CampoSenha nova autoFocus={!!inicial} />
-      <button type="submit" className="btn btn-primary" disabled={pending}>
-        {pending ? "Criando…" : "Criar conta"}
+      {/* From the hero the e-mail is already there, so the cursor starts in the password. */}
+      <CampoSenha nova autoFocus={!!inicial} erro={erroSenha} />
+      <button type="submit" className="btn btn-primary btn-block" disabled={pending}>
+        {pending ? "Criando…" : "Criar conta"} <Seta />
       </button>
-      {state?.error && <div className="notice">{state.error}</div>}
+      {state?.error && !state.campo && (
+        <div className="notice" role="alert">
+          {state.error}
+        </div>
+      )}
       <Aceite verbo="criar a conta" />
     </form>
   );

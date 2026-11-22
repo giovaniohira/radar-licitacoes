@@ -28,7 +28,7 @@ export const JANELA_MINUTOS = 15;
 export const LIMITE_LINKS = 5;
 
 export const ERRO_LOGIN = "E-mail/CNPJ ou senha incorretos.";
-export const ERRO_BLOQUEIO = `Muitas tentativas. Espere ${JANELA_MINUTOS} minutos ou entre pelo link no e-mail.`;
+export const ERRO_BLOQUEIO = `Muitas tentativas. Tente de novo em ${JANELA_MINUTOS} minutos ou entre com um link no e-mail.`;
 export const ERRO_LINKS = "Já enviamos e-mails há pouco. Confira sua caixa de entrada e o spam.";
 
 const MINUTOS: Record<TipoToken, number> = {
@@ -113,13 +113,20 @@ ${(c.depois ?? []).map(p).join("\n")}</div>`,
 
 // --- Lockout ---
 
-async function bloqueado(chaves: { id: string; ip: string | null }): Promise<boolean> {
-  const [r] = await query<{ id: string; ip: string }>(
-    `select count(*) filter (where chave = $1) as id, count(*) filter (where chave = $2) as ip
-     from tentativas_login where chave in ($1, $2) and em > now() - make_interval(mins => $3)`,
-    [chaves.id, chaves.ip ? `ip:${chaves.ip}` : "", JANELA_MINUTOS],
+/**
+ * Seconds until this sign-in is allowed again, 0 when it is not locked. A key is locked while it has the limit of
+ * failures inside the window, so it opens when the limit-th most recent failure leaves the window.
+ */
+async function bloqueado(chaves: { id: string; ip: string | null }): Promise<number> {
+  const [r] = await query<{ s: string | null }>(
+    `with t as (
+       select chave, em, row_number() over (partition by chave order by em desc) as n
+       from tentativas_login where chave in ($1, $2) and em > now() - make_interval(mins => $3))
+     select ceil(extract(epoch from max(em + make_interval(mins => $3) - now()))) as s
+     from t where (chave = $1 and n = $4) or (chave = $2 and n = $5)`,
+    [chaves.id, chaves.ip ? `ip:${chaves.ip}` : "", JANELA_MINUTOS, LIMITE_FALHAS_CONTA, LIMITE_FALHAS_IP],
   );
-  return Number(r.id) >= LIMITE_FALHAS_CONTA || Number(r.ip) >= LIMITE_FALHAS_IP;
+  return Math.max(0, Number(r?.s ?? 0));
 }
 
 async function registrarFalha(chaves: { id: string; ip: string | null }) {
@@ -142,7 +149,18 @@ export async function excedeuEnviosIp(ip: string | null): Promise<boolean> {
 
 // --- Sign-up ---
 
-export type Resposta = { ok?: string; error?: string };
+/** `campo`: which input the error belongs to, so the form can show it under that field. */
+export type Resposta = { ok?: string; error?: string; campo?: "email" | "senha" };
+
+/** Plain-language problem with a typed e-mail address. */
+export function problemaEmail(bruto: string): string | null {
+  if (normalizeEmail(bruto)) return null;
+  const e = bruto.trim();
+  if (!e) return "Digite seu e-mail.";
+  if (!e.includes("@")) return "Confira o e-mail: falta o @.";
+  if (!/@[^@\s]+\.[^@\s]+$/.test(e)) return "Confira o e-mail: falta o final, como .com.br.";
+  return "Confira o e-mail.";
+}
 
 /**
  * Same answer whether or not the address already has an account; what differs is only the e-mail that arrives:
@@ -150,9 +168,9 @@ export type Resposta = { ok?: string; error?: string };
  */
 export async function criarConta(dados: { email: string; senha: string }): Promise<Resposta> {
   const email = normalizeEmail(dados.email);
-  if (!email) return { error: "E-mail inválido." };
+  if (!email) return { error: problemaEmail(dados.email)!, campo: "email" };
   const problema = problemaSenha(dados.senha);
-  if (problema) return { error: problema };
+  if (problema) return { error: problema, campo: "senha" };
   const resposta = { ok: email };
 
   const [existente] = await query<{ id: number; verificado: boolean }>(`select id, email_verificado_em is not null as verificado from users where email = $1`, [email]);
@@ -195,14 +213,16 @@ export async function reenviarVerificacao(emailBruto: string): Promise<Resposta>
 
 // --- Sign-in ---
 
-export type Entrada = { userId: number } | { pendente: string } | { error: string };
+/** `espera`: seconds left in a lockout. */
+export type Entrada = { userId: number } | { pendente: string } | { error: string; espera?: number };
 
 /** Password sign-in by e-mail or CNPJ. `pendente` means the password was right but the address is not confirmed yet. */
 export async function entrarComSenha(identificador: string, senha: string, ip: string | null): Promise<Entrada> {
   const id = parseIdentificador(identificador);
   if (!id || !senha) return { error: ERRO_LOGIN };
   const chaves = { id: `id:${id.valor}`, ip };
-  if (await bloqueado(chaves)) return { error: ERRO_BLOQUEIO };
+  const espera = await bloqueado(chaves);
+  if (espera) return { error: ERRO_BLOQUEIO, espera };
 
   const [u] = await query<{ id: number; email: string; senha_hash: string | null; verificado: boolean }>(
     `select id, email, senha_hash, email_verificado_em is not null as verificado from users where ${id.tipo === "email" ? "email" : "cnpj"} = $1`,
@@ -220,13 +240,26 @@ export async function entrarComSenha(identificador: string, senha: string, ip: s
   return { userId: u.id };
 }
 
-/** Magic link. Like before, an unknown address gets an account, confirmed when the link is opened. */
-export async function pedirLinkAcesso(emailBruto: string): Promise<Resposta> {
-  const email = normalizeEmail(emailBruto);
-  if (!email) return { error: "E-mail inválido." };
-  const [user] = await query<{ id: number }>(`insert into users (email) values ($1) on conflict (email) do update set email = excluded.email returning id`, [email]);
-  if (!(await enviarToken(user.id, email, "login"))) return { error: ERRO_LINKS };
-  return { ok: `Enviamos um link para ${email}. Ele vale ${LOGIN_TOKEN_MINUTES} minutos.` };
+export const OK_LINK = "Se existir uma conta, ele chega em instantes. Abra o e-mail neste aparelho.";
+
+/**
+ * Magic link, by e-mail or CNPJ. Like before, an unknown e-mail gets an account, confirmed when the link is opened;
+ * an unknown CNPJ gets nothing. The answer is the same either way.
+ */
+export async function pedirLinkAcesso(identificador: string): Promise<Resposta> {
+  const id = parseIdentificador(identificador);
+  if (!id) return { error: "Digite um e-mail ou CNPJ válido." };
+  let user: { id: number; email: string } | undefined;
+  if (id.tipo === "email") {
+    [user] = await query<{ id: number; email: string }>(
+      `insert into users (email) values ($1) on conflict (email) do update set email = excluded.email returning id, email`,
+      [id.valor],
+    );
+  } else {
+    [user] = await query<{ id: number; email: string }>(`select id, email from users where cnpj = $1`, [id.valor]);
+  }
+  if (user && !(await enviarToken(user.id, user.email, "login"))) return { error: ERRO_LINKS };
+  return { ok: OK_LINK };
 }
 
 /** Consumes a sign-in, confirmation or e-mail-change token (never a reset token: that one needs a new password). */
@@ -268,14 +301,17 @@ export async function pedirNovaSenha(identificador: string): Promise<Resposta> {
   if (!id) return { error: "Digite um e-mail ou CNPJ válido." };
   const [u] = await query<{ id: number; email: string }>(`select id, email from users where ${id.tipo === "email" ? "email" : "cnpj"} = $1`, [id.valor]);
   if (u) await enviarToken(u.id, u.email, "senha");
-  return { ok: "Se houver uma conta com esse e-mail ou CNPJ, enviamos um link para criar uma nova senha. Confira também o spam." };
+  return { ok: "Se existir uma conta com esse e-mail ou CNPJ, o link chega em instantes no e-mail cadastrado. Confira também o spam." };
 }
 
-/** Is this an unused, unexpired reset token? For the page, before the user types anything. */
-export async function tokenSenhaValido(token: string): Promise<boolean> {
-  if (!token) return false;
-  const r = await query(`select 1 from login_tokens where token_hash = $1 and tipo = 'senha' and usado_em is null and expira_em > now()`, [hashToken(token)]);
-  return r.length > 0;
+/** The account's e-mail for an unused, unexpired reset token, or null. For the page, before the user types anything. */
+export async function tokenSenhaValido(token: string): Promise<string | null> {
+  if (!token) return null;
+  const [r] = await query<{ email: string }>(
+    `select u.email from login_tokens t join users u on u.id = t.user_id where t.token_hash = $1 and t.tipo = 'senha' and t.usado_em is null and t.expira_em > now()`,
+    [hashToken(token)],
+  );
+  return r?.email ?? null;
 }
 
 /**
@@ -320,22 +356,36 @@ export async function trocarSenha(userId: number, atual: string, nova: string, d
   return { ok: u.senha_hash ? "Senha trocada. Os outros aparelhos foram desconectados." : "Senha criada. Agora você também entra com e-mail ou CNPJ e senha." };
 }
 
+export const ERRO_CNPJ_USADO = `Este CNPJ já tem uma conta no Vencedital. Quem cadastrou pode entrar com ele.${
+  EMPRESA.contato ? ` Precisa de ajuda? Escreva para ${EMPRESA.contato}.` : ""
+}`;
+
 /**
- * Onboarding and /conta: saves the company's CNPJ (enables the CNPJ sign-in). One account per CNPJ: a second person
- * from the same company waits for invitations. Only signed-in, confirmed accounts get here, so saying the CNPJ is
- * taken reveals nothing to an anonymous visitor.
+ * Is this CNPJ on another account? Only signed-in, confirmed accounts ask, so the answer reveals nothing to an anonymous
+ * visitor, and it never says whose account it is.
  */
+export async function cnpjDeOutraConta(userId: number, cnpj: string): Promise<boolean> {
+  return (await query(`select 1 from users where cnpj = $1 and id <> $2`, [cnpj, userId])).length > 0;
+}
+
+/** Onboarding and /conta: saves the company's CNPJ (enables the CNPJ sign-in). One account per CNPJ for now. */
 export async function definirCnpj(userId: number, bruto: string): Promise<Resposta & { cnpj?: string }> {
   const cnpj = normalizeCnpj(bruto);
-  if (!cnpj) return { error: "CNPJ inválido. Confira os números." };
-  const ocupado = {
-    error: `Esse CNPJ já tem uma conta no Vencedital. Por enquanto é uma conta por empresa.${EMPRESA.contato ? ` Se a empresa é sua, escreva para ${EMPRESA.contato}.` : ""}`,
-  };
+  if (!cnpj) return { error: "Este CNPJ não existe. Confira os números." };
   try {
     const r = await query(`update users set cnpj = $2 where id = $1 and not exists (select 1 from users where cnpj = $2 and id <> $1) returning id`, [userId, cnpj]);
-    return r.length ? { ok: "CNPJ salvo.", cnpj } : ocupado;
+    return r.length ? { ok: "CNPJ salvo.", cnpj } : { error: ERRO_CNPJ_USADO };
   } catch (err) {
-    if ((err as { code?: string }).code === "23505") return ocupado;
+    if ((err as { code?: string }).code === "23505") return { error: ERRO_CNPJ_USADO };
     throw err;
   }
+}
+
+/** Contracts the company signed as a supplier on the PNCP: the buyers' states (all contracts, most first) and the latest objects. */
+export async function historicoFornecedor(cnpj: string): Promise<{ ufs: string[]; objetos: string[] }> {
+  const [ufs, objetos] = await Promise.all([
+    query<{ uf: string }>(`select uf from contratos where fornecedor_ni = $1 and uf is not null group by uf order by count(*) desc, uf limit 5`, [cnpj]),
+    query<{ objeto: string }>(`select objeto from contratos where fornecedor_ni = $1 order by data_assinatura desc nulls last limit 300`, [cnpj]),
+  ]);
+  return { ufs: ufs.map((r) => r.uf), objetos: objetos.map((r) => r.objeto) };
 }

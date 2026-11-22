@@ -88,8 +88,15 @@ export async function previewAlerta(_: Preview, form: FormData): Promise<Preview
 }
 
 /** Last step of /boas-vindas: the first alert, the editais ticked in its preview go to the pipeline, wizard marked done. */
+/** The onboarding cannot end without the CNPJ (one trial per company, CNPJ sign-in). */
+async function semCnpj(userId: number): Promise<boolean> {
+  const [u] = await query<{ cnpj: string | null }>(`select cnpj from users where id = $1`, [userId]);
+  return !u?.cnpj;
+}
+
 export async function concluirOnboarding(_: FormState, form: FormData): Promise<FormState> {
   const user = await requireUser();
+  if (await semCnpj(user.id)) return { error: "Falta o CNPJ da empresa: volte ao passo 1." };
   const error = await inserir(user.id, parseAlerta(form));
   if (error) return { error };
   const ids = form.getAll("acompanhar").map(String).slice(0, 10);
@@ -101,6 +108,7 @@ export async function concluirOnboarding(_: FormState, form: FormData): Promise<
 
 export async function pularOnboarding() {
   const user = await requireUser();
+  if (await semCnpj(user.id)) redirect("/boas-vindas");
   await query(`update users set onboarding_em = coalesce(onboarding_em, now()) where id = $1`, [user.id]);
   redirect("/painel");
 }
