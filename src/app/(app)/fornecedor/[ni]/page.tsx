@@ -7,6 +7,7 @@ import { HBars, ListaRanking, iniciais } from "@/components/charts";
 import { JsonLd } from "@/components/JsonLd";
 import { Kpi, Loading } from "@/components/ui";
 import { pool } from "@/lib/db";
+import { FINA, fornecedorPublicavel } from "@/lib/indexacao";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, nome } from "@/lib/format";
 import { analisar, fornecedorInfo } from "@/lib/mercado";
 import { siteUrl, trilha } from "@/lib/schema";
@@ -20,7 +21,8 @@ export async function generateMetadata({ params }: PageProps<"/fornecedor/[ni]">
   if (!info) notFound();
   const title = nome(info.nome);
   const description = `Contratos com o governo, principais órgãos clientes e o que ${title} (CNPJ ${formatCNPJ(ni)}) vende, com dados do PNCP.`;
-  return { title, description, alternates: { canonical: `/fornecedor/${ni}` }, openGraph: { title, description } };
+  const fina = !(await fornecedorPublicavel(pool(), ni));
+  return { title, description, alternates: { canonical: `/fornecedor/${ni}` }, openGraph: { title, description }, ...(fina && FINA) };
 }
 
 async function Fornecedor({ params }: PageProps<"/fornecedor/[ni]">) {
