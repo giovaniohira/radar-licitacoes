@@ -298,6 +298,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .erow .v { text-align: right; font-weight: 550; font-variant-numeric: tabular-nums; }
 .erow .acts { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
 .erow .acts form { display: contents; }
+/* A column of solid buttons is noise: the row's primary action stays outlined until the row is hovered or focused. */
+.erow .acts .btn-primary { background: var(--surface); border-color: var(--border-strong); color: var(--text); }
+.erow:hover .acts .btn-primary, .erow:focus-within .acts .btn-primary { background: var(--ink); border-color: var(--ink); color: var(--on-dark); }
 .erow.apagado .t, .erow.apagado .v { opacity: 0.45; }
 .erows-head { padding: 14px 16px 0; }
 .erows-head p { margin-top: 2px; font-size: 13px; color: var(--subtle); }
@@ -363,6 +366,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .facts b { display: block; font-family: var(--serif); font-size: 26px; font-weight: 400; letter-spacing: -0.015em; line-height: 1.2; margin-top: 6px; font-variant-numeric: lining-nums tabular-nums; }
 .facts small { display: block; font-size: 12px; color: var(--subtle); }
 .facts .urg, .facts .urg small { color: var(--danger); }
+/* Stacked on phones: rules go horizontal. */
+@media (max-width: 600px) { .facts > div { border-right: 0; border-bottom: 1px solid var(--line); } .facts > div:last-child { border-bottom: 0; } }
 .ia-head { padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .ia-head .row { flex-wrap: nowrap; }
 .ia-head svg { color: var(--brand); flex: none; }
@@ -736,15 +741,18 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .auth-main > .logo .logo-word { font-size: 18px; }
 .auth-box { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 0; }
 .auth-box > div { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 20px; }
-.auth-box h1 { font-size: 28px; font-weight: 750; letter-spacing: -0.03em; }
+.auth-box h1 { font-size: 40px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.05; }
 .auth-box h1 + p { margin-top: 6px; color: var(--muted); }
 .auth-box .field { font-size: 13px; font-weight: 550; }
-.auth-box .btn-primary { height: 46px; font-size: 15px; font-weight: 600; border-radius: var(--r); }
-.auth-aside { flex: 1 1 420px; min-width: 0; background: var(--brand-soft); padding: clamp(32px, 5vw, 72px); display: flex; flex-direction: column; justify-content: center; gap: 24px; }
-.auth-aside h2 { font-size: 26px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.2; color: var(--navy); max-width: 420px; }
-.auth-aside ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
-.auth-aside li { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; color: var(--navy); line-height: 1.5; }
-.auth-aside li span { width: 26px; height: 26px; flex: none; border-radius: 50%; background: var(--surface); color: var(--brand-text); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.auth-box .btn-primary { height: 46px; font-size: 15px; font-weight: 500; }
+/* Ink panel with the same hairline grid as the landing hero. */
+.auth-aside { position: relative; flex: 1 1 420px; min-width: 0; background: var(--ink); color: var(--on-dark); padding: clamp(32px, 5vw, 72px); display: flex; flex-direction: column; justify-content: center; gap: 32px; isolation: isolate; overflow: hidden; }
+.auth-aside::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px); background-size: 96px 100%; -webkit-mask-image: linear-gradient(to bottom, #000, transparent 85%); mask-image: linear-gradient(to bottom, #000, transparent 85%); }
+.auth-aside h2 { font-family: var(--serif); font-size: clamp(34px, 3.6vw, 48px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.05; color: var(--on-dark); max-width: 12ch; }
+.auth-aside ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-width: 440px; border-top: 1px solid var(--ink-line); }
+.auth-aside li { display: flex; gap: 16px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--ink-line); font-size: 15px; color: var(--on-ink-muted); line-height: 1.5; }
+.auth-aside li span { flex: none; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--brand); }
+.auth-aside li span::before { content: "0"; }
 .sent { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--r); background: var(--ok-soft); color: var(--ok-text); font-size: 13px; line-height: 1.5; }
 .sent svg { flex: none; margin-top: 1px; }
 .centro { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
@@ -760,8 +768,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .onb-form { flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .onb-form > [hidden] { display: none; }
 .onb-step { display: flex; flex-direction: column; gap: 22px; }
-.onb-step .k { font-size: 13px; font-weight: 600; color: var(--brand-text); }
-.onb-step h1 { margin-top: 6px; font-size: clamp(26px, 3vw, 32px); font-weight: 750; letter-spacing: -0.03em; line-height: 1.2; }
+.onb-step .k { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-text); }
+.onb-step h1 { margin-top: 10px; font-size: clamp(32px, 3.6vw, 44px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.08; }
 .onb-step h1 + p { margin-top: 8px; color: var(--muted); line-height: 1.5; }
 .onb-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
 .onb-card { position: relative; text-align: left; padding: 14px 16px; border-radius: var(--r-card); cursor: pointer; display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--border-strong); background: var(--surface); font: inherit; color: inherit; }
