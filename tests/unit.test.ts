@@ -9,6 +9,7 @@ import { dias, hojeBR } from "@/lib/ingest";
 import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
 import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
+import { minimoDePalavras, prefiltroGin, termosDoObjeto } from "@/lib/quemganhou";
 import { PRIVADAS, robotsFor } from "@/lib/robots";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
 
@@ -309,5 +310,34 @@ describe("legal copy", () => {
       });
     const achados = arquivos("src").filter((f) => /\{(CNPJ|ENDERECO|CIDADE_FORO|DATA_PUBLICACAO|PRECO|CONTATO|PROVEDOR_\w+|PAIS_\w+|PRAZO_BACKUP|NOME|DOMINIO)\}/.test(readFileSync(f, "utf8")));
     expect(achados).toEqual([]);
+  });
+});
+
+describe("quem ganhou: palavras do objeto", () => {
+  it("keeps the distinctive words, without accents, in order, dropping boilerplate and the buyer's own name", () => {
+    expect(termosDoObjeto("Contratação de empresa especializada para a prestação de serviços de manutenção preventiva e corretiva de veículos")).toEqual([
+      "manutencao",
+      "preventiva",
+      "corretiva",
+      "veiculos",
+    ]);
+    // The buyer's name and city are in every one of its contracts, so they say nothing about what is bought.
+    expect(termosDoObjeto("Aquisição de colchão para o Hospital de Criciúma", "MUNICIPIO DE CRICIUMA Hospital")).toEqual(["colchao"]);
+  });
+
+  it("reads only the start of the text, at most six words, and ignores numbers and short words", () => {
+    const longo = `Aquisição de ${"alfa bravo charlie delta echo foxtrot golf hotel ".repeat(3)}`;
+    expect(termosDoObjeto(longo)).toEqual(["alfa", "bravo", "charlie", "delta", "echo", "foxtrot"]);
+    expect(termosDoObjeto("Compra de 2TB u2013 HD e cabo")).toEqual(["cabo"]);
+    expect(termosDoObjeto("")).toEqual([]);
+  });
+
+  it("asks for more shared words as the object grows, and gives the index a selective pair query", () => {
+    expect([1, 2, 3, 4, 5, 6].map(minimoDePalavras)).toEqual([1, 2, 2, 2, 2, 2]);
+    expect(prefiltroGin(["colchao"])).toBe("colchao");
+    expect(prefiltroGin(["a1b", "c2d"])).toBe("(a1b & c2d)");
+    // Every pair has one of the two leading words, so a contract that matches only trailing words is never required.
+    expect(prefiltroGin(["aaaa", "bbbb", "cccc", "dddd"])).toBe("(aaaa & bbbb) | (aaaa & cccc) | (aaaa & dddd) | (bbbb & cccc) | (bbbb & dddd)");
+    expect(prefiltroGin([])).toBe("");
   });
 });

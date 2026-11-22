@@ -14,6 +14,7 @@ import { currentUser } from "@/lib/session";
 import type { Resumo } from "@/lib/summary";
 import { adicionarAoPipeline, mudarEtapa, removerDoPipeline } from "../../../actions/pipeline";
 import { Checklist, Notas } from "./Disputa";
+import { QuemJaGanhou } from "./QuemGanhou";
 import { ResumoIA } from "./ResumoIA";
 
 type Edital = EditalRow & { valor_estimado: string | null };
@@ -375,6 +376,10 @@ async function Edital({ params }: PageProps<"/edital/[id]">) {
           <b style={{ fontSize: 17 }}>{resumo ? resumo.dados.criterio_julgamento : (e.situacao ?? "—")}</b>
         </div>
       </section>
+
+      <Suspense fallback={<section className="card card-pad" style={{ minHeight: 96 }}><p className="small muted">Buscando contratos parecidos deste órgão…</p></section>}>
+        <QuemJaGanhou cnpj={e.cnpj} objeto={e.objeto} excluir={`${e.orgao} ${e.municipio ?? ""} ${e.unidade ?? ""}`} />
+      </Suspense>
 
       <div className="cols">
         <div className="col-main">
