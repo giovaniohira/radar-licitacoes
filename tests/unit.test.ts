@@ -361,6 +361,9 @@ describe("edital title", () => {
   it("drops a stray leading dash and keeps the title short", () => {
     expect(tituloEdital("- Contratação de empresa para readequação de rede", 60)).not.toMatch(/^-/);
     expect(tituloEdital("Aquisição de pneus ".repeat(10), 60).length).toBeLessThanOrEqual(61);
+  });
+});
+
 describe("sitemap", () => {
   it("writes a urlset with absolute escaped URLs and only true lastmod dates", () => {
     const x = urlset("https://exemplo.com.br", [
