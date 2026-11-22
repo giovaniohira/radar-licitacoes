@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AuthLayout } from "@/components/AuthLayout";
 import { EsqueciForm } from "./EsqueciForm";
 
-export const metadata: Metadata = { title: "Esqueci a senha" };
+export const metadata: Metadata = { title: "Esqueci a senha", robots: { index: false } };
 
 export default function Esqueci() {
   return (
