@@ -3,6 +3,7 @@
 import { closePool, pool } from "../src/lib/db";
 import { prepararResumosDoDigest, sendDigests } from "../src/lib/alerts";
 import { hojeBR, ingestContratosDia, ingestDia } from "../src/lib/ingest";
+import { resumoConfigurado } from "../src/lib/summary-tipos";
 
 const INGEST_HOURS = [6, 12, 18];
 const CONTRATOS_HOUR = 6;
@@ -52,7 +53,7 @@ async function tick() {
       }
     }
     // The 06h slot ends with the summaries for the 7h e-mail, after the ingest that feeds it. Off without an Anthropic key.
-    if (hour === CONTRATOS_HOUR && process.env.ANTHROPIC_API_KEY) {
+    if (hour === CONTRATOS_HOUR && resumoConfigurado()) {
       await step("resumos do e-mail", async () => {
         const r = await prepararResumosDoDigest(pool(), { log: (m) => console.log(m) });
         return `${r.resumidos} novos de ${r.escolhidos} editais`;

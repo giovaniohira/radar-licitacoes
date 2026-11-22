@@ -11,11 +11,13 @@ import { closePool, pool } from "../src/lib/db";
 import { fetchArquivos, pickEdital, type EditalRow } from "../src/lib/pncp";
 import { SETORES } from "../src/lib/setores";
 import { buildSearch } from "../src/lib/search";
-import { downloadPdf, summarizePdf } from "../src/lib/summary";
+import { downloadPdf, provedor, summarizePdf } from "../src/lib/summary";
 
 const arg = (nome: string) => process.argv.find((a) => a.startsWith(`--${nome}=`))?.split("=").slice(1).join("=");
 const N = Number(arg("n") ?? 20);
-const modelos = (arg("modelos") ?? "claude-opus-5-5").split(",");
+const MOSTRAR = Number(arg("mostrar") ?? 0);
+let mostrados = 0;
+const modelos = (arg("modelos") ?? (provedor() === "deepseek" ? "deepseek-flash" : "claude-opus-5-5")).split(",");
 const precos = new Map(
   (arg("precos") ?? "").split(",").filter(Boolean).map((p) => {
     const [m, v] = p.split("=");
@@ -54,14 +56,23 @@ async function amostra(): Promise<{ edital: EditalRow; setor: string; pdf: Buffe
 async function main() {
   const itens = await amostra();
   console.log(`${itens.length} editais, ${modelos.length} modelo(s)`);
-  const client = new Anthropic();
+  // DeepSeek reads the PDF's text and needs no client; Anthropic reads the PDF itself.
+  const client = provedor() === "deepseek" ? undefined : new Anthropic();
   const soma = new Map<string, { n: number; entrada: number; saida: number; usd: number; seg: number }>();
   for (const { edital, setor, pdf } of itens) {
     for (const modelo of modelos) {
       process.env.RESUMO_MODEL = modelo;
+      process.env.RESUMO_MODEL_DEEPSEEK = modelo;
       const t = Date.now();
       try {
-        const { uso } = await summarizePdf(pdf, client);
+        const { resumo, uso } = await summarizePdf(pdf, client);
+        if (mostrados < MOSTRAR) {
+          mostrados++;
+          console.log(`--- ${edital.id}
+EDITAL: ${edital.objeto.slice(0, 160)}
+${JSON.stringify(resumo, null, 1)}
+---`);
+        }
         const seg = (Date.now() - t) / 1000;
         const p = precos.get(modelo);
         const usd = p ? (uso.entrada * p.entrada + uso.saida * p.saida) / 1e6 : NaN;

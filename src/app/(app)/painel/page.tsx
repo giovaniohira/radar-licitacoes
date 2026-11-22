@@ -9,6 +9,7 @@ import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazoTom, tituloC
 import { first } from "@/lib/params";
 import { ETAPAS, etapaLabel, listPipeline, vencendo, type Etapa, type PipelineItem } from "@/lib/pipeline";
 import { buildSearch, type EditalResumo } from "@/lib/search";
+import { resumoConfigurado } from "@/lib/summary-tipos";
 import { requireUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Hoje", robots: { index: false } };
@@ -225,7 +226,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
   const passos = [
     { label: "Criar seu primeiro alerta", texto: "Diga o que você vende e os editais novos chegam aqui e no e-mail das 7h.", acao: "Criar alerta", href: "/boas-vindas", feito: alerts.length > 0 },
     { label: "Marcar um edital que interessa", texto: "Na busca, clique em Tenho interesse: ele entra em Minhas disputas.", acao: "Encontrar editais", href: "/buscar", feito: itens.length > 0 },
-    ...(process.env.ANTHROPIC_API_KEY
+    ...(resumoConfigurado()
       ? [{ label: "Ler o resumo por IA de um edital", texto: "A IA lê o PDF e responde o que importa: prazos, documentos e pegadinhas.", acao: "Abrir edital", href: itens[0] ? editalHref(itens[0].edital_id) : "/buscar", feito: resumiu }]
       : []),
   ];

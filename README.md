@@ -72,7 +72,7 @@ npm run ingest -- 2026-10-01 2026-10-15 --contratos  # contratos para o Mercado 
 npm run dev
 ```
 
-Sem `SMTP_URL`, os e-mails saem no terminal. Sem `ANTHROPIC_API_KEY`, o resumo por IA fica desativado.
+Sem `SMTP_URL`, os e-mails saem no terminal. Sem `ANTHROPIC_API_KEY` (ou `DEEPSEEK_API_KEY` com `RESUMO_PROVEDOR=deepseek`), o resumo por IA fica desativado. Com a chave, o job das 06h gera o resumo dos 3 editais de cada e-mail das 7h, até `RESUMO_EMAIL_TETO_DIARIO` por dia.
 
 ## Testes
 

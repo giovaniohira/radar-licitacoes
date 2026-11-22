@@ -1,24 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { z } from "zod";
 import type { Pool } from "pg";
+import { extrairTexto, resumirTexto } from "./deepseek";
 import { fetchArquivos, pickEdital, type EditalRow } from "./pncp";
+import { ResumoError, ResumoSchema, provedor, resumoConfigurado, type Resumo, type UsoDeTokens } from "./summary-tipos";
 
-export const ResumoSchema = z.object({
-  objeto: z.string().describe("O que está sendo contratado, em 1-2 frases simples."),
-  valor_estimado: z.string().describe("Valor estimado total ou por lote, como aparece no edital; 'não informado' se ausente."),
-  prazos: z
-    .array(z.object({ evento: z.string(), data: z.string() }))
-    .describe("Datas relevantes: abertura, limite de propostas, impugnação, esclarecimentos, sessão pública."),
-  exigencias_habilitacao: z.array(z.string()).describe("Documentos e requisitos de habilitação (jurídica, fiscal, técnica, econômica)."),
-  exclusivo_me_epp: z.boolean().describe("Se há participação exclusiva ou cota reservada para ME/EPP."),
-  garantia: z.string().describe("Garantia de proposta ou contratual exigida; 'não exige' se não houver."),
-  criterio_julgamento: z.string(),
-  local_entrega_execucao: z.string(),
-  pontos_de_atencao: z.array(z.string()).describe("Riscos e armadilhas para uma pequena empresa: amostras, visita técnica, atestados, multas, prazos curtos."),
-});
+export { ResumoError, ResumoSchema, provedor, resumoConfigurado, type Resumo, type UsoDeTokens };
 
-export type Resumo = z.infer<typeof ResumoSchema>;
+
+
 
 export const LIMITE_DIARIO = Number(process.env.RESUMO_LIMITE_DIARIO ?? 10);
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
@@ -26,8 +16,6 @@ const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const SYSTEM = `Você lê editais de licitação brasileiros (Lei 14.133/2021) e resume para o dono de uma pequena empresa decidir se vale participar.
 Extraia apenas o que está no documento. Quando algo não estiver no edital, diga "não informado" em vez de supor.
 Escreva em português claro, sem juridiquês, com datas no formato dd/mm/aaaa hh:mm.`;
-
-export class ResumoError extends Error {}
 
 export async function downloadPdf(url: string, fetchImpl: typeof fetch = fetch): Promise<Buffer> {
   const res = await fetchImpl(url, { signal: AbortSignal.timeout(120_000) });
@@ -42,12 +30,10 @@ export async function downloadPdf(url: string, fetchImpl: typeof fetch = fetch):
   return buf;
 }
 
-export interface UsoDeTokens {
-  entrada: number;
-  saida: number;
-}
 
-export async function summarizePdf(pdf: Buffer, client = new Anthropic()): Promise<{ resumo: Resumo; modelo: string; uso: UsoDeTokens }> {
+export async function summarizePdf(pdf: Buffer, client?: Anthropic): Promise<{ resumo: Resumo; modelo: string; uso: UsoDeTokens }> {
+  if (!client && provedor() === "deepseek") return resumirTexto(await extrairTexto(pdf));
+  client ??= new Anthropic();
   const response = await client.beta.messages.parse({
     model: process.env.RESUMO_MODEL ?? "claude-opus-5-5",
     max_tokens: 16000,
