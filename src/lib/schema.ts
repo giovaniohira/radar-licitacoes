@@ -1,5 +1,7 @@
 import { DIAS_TESTE, EMPRESA, PRECO_MENSAL } from "./empresa";
 
+export { siteUrl } from "./site";
+
 /**
  * schema.org data for the public pages. Everything here is a fact the page already shows: the real price,
  * the real company, the FAQ as written. No rating or review is ever emitted (there are no customers yet,
@@ -7,11 +9,6 @@ import { DIAS_TESTE, EMPRESA, PRECO_MENSAL } from "./empresa";
  */
 
 export type JsonLd = Record<string, unknown>;
-
-/** The site's absolute origin, from the same APP_URL the sitemap and metadataBase use (no trailing slash). */
-export function siteUrl(): string {
-  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
-}
 
 /** Serializes for a <script type="application/ld+json">: "<" is escaped so no string can close the tag. */
 export function serializar(data: JsonLd): string {
