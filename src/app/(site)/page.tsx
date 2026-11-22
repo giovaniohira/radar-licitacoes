@@ -16,16 +16,6 @@ import produtoBusca from "./produto-busca.webp";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
-const RECURSOS = [
-  { t: "Receba só o que é novo", d: "No máximo um e-mail por dia, só quando houver edital novo para você." },
-  { t: "Decida sem ler o PDF inteiro", d: "A IA lê o edital e responde o que importa: prazos, habilitação, cota ME/EPP e pegadinhas." },
-  {
-    t: "Todos os prazos num lugar só",
-    d: "Suas disputas num quadro, com a lista de documentos. Ligue sua agenda uma vez e receba aviso um dia antes do prazo.",
-  },
-  { t: "Direto da fonte oficial", d: "Tudo vem do PNCP, de órgãos federais, estaduais e municipais do Brasil inteiro." },
-];
-
 const PASSOS = [
   { t: "Diga o que você vende", d: "Escolha seu ramo. A busca já vem com as palavras que os órgãos usam, e você ajusta depois." },
   { t: "Receba só o que combina", d: "Todo dia às 7h, os editais novos do seu ramo e dos seus estados no e-mail." },
@@ -297,30 +287,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="sec sec-white" aria-labelledby="rec-h">
-        <div className="container">
-          <div className="sec-head">
-            <Kicker n="03">Recursos</Kicker>
-            <h2 id="rec-h" className="display sec-h">
-              Do edital publicado à proposta enviada, sem planilha.
-            </h2>
-          </div>
-          <div className="recursos">
-            {RECURSOS.map((r, i) => (
-              <article key={r.t} className="reveal">
-                <span className="n">0{i + 1}</span>
-                <h3>{r.t}</h3>
-                <p>{r.d}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="sec sec-sand" aria-labelledby="mercado-h">
         <div className="container mercado">
           <div>
-            <Kicker n="04">Mercado</Kicker>
+            <Kicker n="03">Mercado</Kicker>
             <h2 id="mercado-h" className="display sec-h">
               Antes de dar o preço, veja quem já ganhou
             </h2>
@@ -337,7 +307,7 @@ export default function Home() {
       <section id="precos" className="sec" aria-labelledby="precos-h">
         <div className="container">
           <div className="sec-head">
-            <Kicker n="05">Preços</Kicker>
+            <Kicker n="04">Preços</Kicker>
             <h2 id="precos-h" className="display sec-h">
               Um plano, um preço
             </h2>
@@ -384,7 +354,7 @@ export default function Home() {
       <section className="sec sec-white" aria-labelledby="faq-h">
         <div className="container faq-grid">
           <div className="faq-side">
-            <Kicker n="06">Dúvidas</Kicker>
+            <Kicker n="05">Dúvidas</Kicker>
             <h2 id="faq-h" className="display sec-h">
               Antes de começar
             </h2>
@@ -411,15 +381,6 @@ export default function Home() {
               Começar teste grátis {seta}
             </Link>
           </div>
-          <p className="assinatura">
-            Feito por Giovani Ohira, da {EMPRESA.razaoSocial}, porque achar licitação hoje é uma planilha e muita paciência.
-            {EMPRESA.contato && (
-              <>
-                {" "}
-                Se o resumo errar ou faltar algo, escreva para <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>: quem responde sou eu.
-              </>
-            )}
-          </p>
         </div>
       </section>
     </main>
