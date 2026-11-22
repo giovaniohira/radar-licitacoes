@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { MARK } from "@/components/icons";
 
-export const alt = "Vencedital: os editais do seu ramo chegam às 7h, já lidos pela IA";
+export const alt = "Vencedital: os editais do seu ramo chegam às 7h. Você abre, a IA resume.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -20,8 +20,8 @@ export default function Image() {
           vencedital
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.05, letterSpacing: -2 }}>Os editais do seu ramo chegam às 7h. Já lidos.</div>
-          <div style={{ fontSize: 32, color: "#FDBA74" }}>Alerta diário do PNCP, resumo do edital por IA e controle das suas disputas.</div>
+          <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.05, letterSpacing: -2 }}>Os editais do seu ramo chegam às 7h.</div>
+          <div style={{ fontSize: 32, color: "#FDBA74" }}>A IA resume os editais que você abrir. Você acompanha prazos e documentos.</div>
         </div>
       </div>
     ),

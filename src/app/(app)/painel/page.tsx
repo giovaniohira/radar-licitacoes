@@ -249,7 +249,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
       </header>
       {first(sp.bemvindo) && (
         <div className="notice ok">
-          <b>Tudo pronto.</b> Seu alerta já está ativo: os editais novos aparecem aqui, e o primeiro e-mail sai {proximoEmail}.
+          <b>Tudo pronto.</b> Seu alerta já está ativo: os editais novos aparecem aqui, e o primeiro e-mail sai {proximoEmail}, se houver edital novo.
         </div>
       )}
 
@@ -297,7 +297,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
               <Link href="/boas-vindas">Crie um alerta</Link> e os editais novos aparecem aqui e no seu e-mail das 7h.
             </Empty>
           ) : linhas.length === 0 ? (
-            <Empty title="Nada novo nas últimas 24h">Seus alertas são verificados 3 vezes por dia. O próximo e-mail sai {proximoEmail}.</Empty>
+            <Empty title="Nada novo nas últimas 24h">O PNCP é lido 3 vezes por dia. O próximo e-mail sai {proximoEmail}, se houver edital novo.</Empty>
           ) : (
             <EditalRows>
               {linhas.map((e) => (

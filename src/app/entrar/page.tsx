@@ -15,7 +15,7 @@ export default function Entrar(props: PageProps<"/entrar">) {
     <AuthLayout>
       <div>
         <h1>Entrar no Vencedital</h1>
-        <p>Sem senha: mandamos um link de acesso para o seu e-mail.</p>
+        <p>Não tem senha. Digite seu e-mail e mandamos um link para entrar.</p>
       </div>
       <Suspense>
         <Erro {...props} />
