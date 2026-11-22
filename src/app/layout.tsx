@@ -13,7 +13,7 @@ const display = Space_Grotesk({ variable: "--font-display", subsets: ["latin"] }
 
 const title = "Vencedital — alerta diário de licitações do PNCP, com o edital lido por IA";
 const description =
-  "Todo dia às 7h, as licitações novas do seu ramo no seu e-mail, já resumidas por IA: prazos, habilitação, cota ME/EPP e pontos de atenção. 14 dias grátis, preço na tela.";
+  "Todo dia às 7h, as licitações novas do seu ramo no seu e-mail. A IA resume o edital: prazos, documentos, cota ME/EPP e riscos. 14 dias grátis.";
 
 export const metadata: Metadata = {
   // Absolute URLs for OG images and canonicals; APP_URL is passed at build time (see Dockerfile).

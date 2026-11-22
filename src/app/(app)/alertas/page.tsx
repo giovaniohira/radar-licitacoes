@@ -78,7 +78,7 @@ async function Alertas({ searchParams }: PageProps<"/alertas">) {
 
   return (
     <div className="page" style={{ gap: 20 }}>
-      <PageHead title="Alertas" sub="Um único e-mail por dia, às 7h, só com editais que você ainda não recebeu." />
+      <PageHead title="Alertas" sub="No máximo um e-mail por dia, às 7h, só com editais que você ainda não recebeu." />
       {salvo && <div className="notice ok">{salvo === "editado" ? "Alerta atualizado." : "Busca salva como alerta."}</div>}
       {erro && <div className="notice">{erro}</div>}
 

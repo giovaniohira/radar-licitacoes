@@ -536,7 +536,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 /* Hairline column grid fading down, and a low orange glow: depth without imagery. */
 .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px); background-size: 120px 100%; background-position: center top; -webkit-mask-image: linear-gradient(to bottom, #000, transparent 70%); mask-image: linear-gradient(to bottom, #000, transparent 70%); }
 .hero::after { content: ""; position: absolute; z-index: -1; width: 1000px; height: 700px; right: -260px; top: 200px; background: radial-gradient(closest-side, rgb(249 115 22 / 0.15), transparent); pointer-events: none; }
-.hero-h { margin-top: 28px; font-size: clamp(46px, 7.6vw, 112px); max-width: 13.5ch; }
+.hero-h { margin-top: 28px; font-size: clamp(44px, 6.4vw, 96px); max-width: 21ch; }
+/* The italic answer reads as one phrase: keep it on its own line where it fits. */
+@media (min-width: 900px) { .hero-h em { white-space: nowrap; } }
 .hero-intro { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 28px clamp(32px, 6vw, 96px); margin-top: clamp(32px, 4vw, 56px); align-items: start; }
 @media (max-width: 960px) { .hero-intro { grid-template-columns: minmax(0, 1fr); } }
 .hero-cta { display: flex; flex-direction: column; gap: 18px; }
@@ -644,27 +646,14 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 @media (max-width: 900px) { .ia-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .ia-grid { grid-template-columns: minmax(0, 1fr); } .ia-grid dt::before { margin-bottom: 16px; } }
 
-/* 03 Recursos: four columns on a rule that turns orange on hover. */
-.recursos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 48px 32px; }
-.recursos article { position: relative; display: flex; flex-direction: column; gap: 10px; padding-top: 24px; border-top: 1px solid var(--border-strong); }
-.recursos article::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: var(--brand); transform: scaleX(0); transform-origin: left; transition: transform 0.5s var(--ease); }
-.recursos article:hover::before { transform: scaleX(1); }
-.recursos .n { margin-bottom: 24px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--subtle); }
-.recursos h3 { font-family: var(--serif); font-size: 25px; font-weight: 400; letter-spacing: -0.015em; line-height: 1.2; }
-/* Two title lines reserved, so the four paragraphs start on one baseline. */
-@media (min-width: 961px) { .recursos h3 { min-height: 2.4em; } }
-.recursos p { font-size: 15px; line-height: 1.6; color: var(--muted); }
-@media (max-width: 960px) { .recursos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .recursos { grid-template-columns: minmax(0, 1fr); } }
-
-/* 04 Mercado */
+/* 03 Mercado */
 .mercado { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 32px 64px; align-items: end; }
 .mercado > div:first-child { display: flex; flex-direction: column; gap: 22px; }
 .mercado-body { display: flex; flex-direction: column; gap: 28px; }
 .mercado-body p { font-size: 17px; line-height: 1.6; color: var(--muted); }
 @media (max-width: 860px) { .mercado { grid-template-columns: minmax(0, 1fr); } }
 
-/* 05 Preços: two plans in one ruled frame, the paid one in ink. */
+/* 04 Preços: two plans in one ruled frame, the paid one in ink. */
 .precos { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); border: 1px solid var(--border-strong); }
 .plano { display: flex; flex-direction: column; gap: 20px; padding: clamp(28px, 4vw, 48px); background: var(--surface); }
 .plano h3 { font-family: var(--serif); font-size: 28px; font-weight: 400; letter-spacing: -0.015em; }
@@ -685,7 +674,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .fundador b { color: var(--text); font-weight: 600; }
 @media (max-width: 860px) { .precos { grid-template-columns: minmax(0, 1fr); } .inclui { grid-template-columns: minmax(0, 1fr); } }
 
-/* 06 Dúvidas: sticky heading, ruled accordion, a plus that folds into a minus. */
+/* 05 Dúvidas: sticky heading, ruled accordion, a plus that folds into a minus. */
 .faq-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px 64px; align-items: start; }
 .faq-side { position: sticky; top: 104px; display: flex; flex-direction: column; gap: 22px; }
 @media (max-width: 860px) { .faq-grid { grid-template-columns: minmax(0, 1fr); } .faq-side { position: static; } }
@@ -710,7 +699,6 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .cta-final h2 { font-size: clamp(44px, 7vw, 104px); max-width: 15ch; }
 .cta-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px; margin-top: clamp(40px, 5vw, 72px); padding-top: 28px; border-top: 1px solid var(--ink-line); }
 .cta-row p { font-size: 18px; color: var(--on-ink-muted); }
-.assinatura { margin-top: 48px; max-width: 640px; font-size: 13px; line-height: 1.6; color: var(--on-ink-subtle); }
 
 /* Footer, with the wordmark set huge and fading into the floor. */
 .site-foot { overflow: hidden; border-top: 1px solid var(--ink-line); }

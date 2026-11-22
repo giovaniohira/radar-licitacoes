@@ -16,37 +16,30 @@ import produtoBusca from "./produto-busca.webp";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
-const RECURSOS = [
-  { t: "Receba só o que é novo", d: "Um e-mail por dia com os editais que você ainda não viu. Nada de buscar de novo amanhã." },
-  { t: "Decida sem ler o PDF inteiro", d: "A IA lê o edital e responde o que importa: prazos, habilitação, cota ME/EPP e pegadinhas." },
-  { t: "Não perca nenhum prazo", d: "Suas disputas num quadro, com checklist de documentos e lembrete na sua agenda." },
-  { t: "Direto da fonte oficial", d: "Tudo vem do PNCP, de órgãos federais, estaduais e municipais do Brasil inteiro." },
-];
-
 const PASSOS = [
   { t: "Diga o que você vende", d: "Escolha seu ramo. A busca já vem com as palavras que os órgãos usam, e você ajusta depois." },
   { t: "Receba só o que combina", d: "Todo dia às 7h, os editais novos do seu ramo e dos seus estados no e-mail." },
-  { t: "Marque o que interessa", d: "O edital vai para Minhas disputas com resumo, checklist e prazo na agenda." },
+  { t: "Marque o que interessa", d: "Clique em Tenho interesse. O edital fica em Minhas disputas, com a lista do que falta entregar e o prazo." },
 ];
 
 const IA = [
   { t: "Objeto", d: "o que o órgão está comprando, sem o juridiquês." },
-  { t: "Prazos", d: "sessão, limite da proposta e vigência." },
+  { t: "Prazos", d: "abertura, limite da proposta, impugnação e sessão." },
   { t: "Habilitação", d: "as certidões, atestados e registros que o edital exige." },
   { t: "Exclusividade ME/EPP", d: "se a disputa é reservada." },
   { t: "Garantia", d: "se pede garantia, e de quanto." },
-  { t: "Pontos de atenção", d: "a amostra em 3 dias, a entrega numa cidade que você não atende." },
+  { t: "Pontos de atenção", d: "o que costuma pegar empresa pequena: amostra, visita técnica, atestados, multas, prazo curto e local de entrega." },
 ];
 
 const FAQ = [
-  { q: "Quanto custa?", a: `R$ ${PRECO_MENSAL}/mês, com ${DIAS_TESTE} dias grátis. Está na tela, sem "fale com o comercial".` },
+  { q: "Quanto custa?", a: `R$ ${PRECO_MENSAL} por mês, um plano só. Os primeiros ${DIAS_TESTE} dias são grátis e não pedem cartão.` },
   {
     q: "De onde vêm os editais?",
-    a: "Do PNCP, o Portal Nacional de Contratações Públicas, que é a fonte oficial e obrigatória da Lei 14.133/2021. Órgãos federais, estaduais e municipais. O Vencedital lê o PNCP três vezes por dia.",
+    a: "Do PNCP, o Portal Nacional de Contratações Públicas. A Lei 14.133/2021 obriga os órgãos a publicar lá.",
   },
   {
     q: "Cobre minha cidade?",
-    a: "Se o órgão da sua cidade publica no PNCP, sim. Municípios pequenos que ainda só publicam em diário oficial próprio não entram, e o Vencedital não finge que entram.",
+    a: "Se o órgão da sua cidade publica no PNCP, sim. Prefeituras que só publicam no próprio diário oficial ainda não aparecem.",
   },
   {
     q: "E se eu não souber quais palavras usar?",
@@ -54,11 +47,12 @@ const FAQ = [
   },
   {
     q: "O resumo da IA pode errar?",
-    a: "Pode. Ele serve para você decidir rápido se vale abrir o edital, não para substituir o edital. Toda tela de resumo tem o link do documento original.",
+    a: "Pode. Ele serve para você decidir se vale abrir o edital, e o link do documento original fica ao lado. Não é assessoria jurídica nem consultoria: a decisão e a proposta são suas.",
   },
-  { q: "O resumo é assessoria jurídica?", a: "Não. Ele resume o edital para você decidir se vale abrir; a decisão e a proposta são suas." },
-  { q: "Preciso de senha?", a: "Não. Você digita o e-mail, recebe um link e entra. Nada de senha para esquecer." },
-  { q: "Vocês são do governo?", a: "Não. Os dados são públicos e vêm do PNCP; o Vencedital não tem nenhum vínculo com o governo." },
+  {
+    q: "Preciso de senha?",
+    a: "Não. Você digita o e-mail e recebe um link. Clique nele e pronto. O link vale 20 minutos e só funciona uma vez.",
+  },
   {
     q: "Como cancelo?",
     a: `${EMPRESA.contato ? `Por e-mail para ${EMPRESA.contato}, sem multa.` : "Sem multa e sem fidelidade."} O acesso vai até o fim do mês pago.`,
@@ -71,9 +65,9 @@ const FAQ = [
 // never runs off narrower screens.
 const DESTAQUES: { t: string; d: string; alvo: [number, number, number, number]; bolha: { left?: number; right?: number; top: number } }[] = [
   { t: "Diga o que você vende", d: "A busca já vem com as palavras que os órgãos usam.", alvo: [66, 25, 7, 3.4], bolha: { left: 69, top: 6 } },
-  { t: "Receba só o que é novo", d: "Salve a busca e os editais novos chegam às 7h.", alvo: [84.6, 53.3, 11.1, 4.3], bolha: { right: 4, top: 39 } },
-  { t: "Marque o que interessa", d: "O edital vai para Minhas disputas, com checklist.", alvo: [78, 70.6, 8.9, 3.8], bolha: { right: -2, top: 80 } },
-  { t: "Não perca nenhum prazo", d: "O prazo da proposta em cada edital.", alvo: [68.2, 87, 5.2, 2.4], bolha: { left: 44, top: 92 } },
+  { t: "Receba só o que é novo", d: "Salve a busca. Os novos chegam às 7h no e-mail.", alvo: [84.6, 53.3, 11.1, 4.3], bolha: { right: 4, top: 39 } },
+  { t: "Marque o que interessa", d: "Guarde em Minhas disputas e veja o que falta.", alvo: [78, 70.6, 8.9, 3.8], bolha: { right: -2, top: 80 } },
+  { t: "Veja o prazo de cada edital", d: "A data limite da proposta, em destaque.", alvo: [68.2, 87, 5.2, 2.4], bolha: { left: 44, top: 92 } },
 ];
 
 const pct = (n: number) => `${n}%`;
@@ -157,17 +151,17 @@ export default function Home() {
         <div className="container">
           <p className="kicker rise">Alerta diário de licitações do PNCP</p>
           <h1 className="display hero-h rise d1">
-            Os editais do seu ramo chegam às 7h. <em>Já lidos.</em>
+            Os editais do seu ramo chegam às 7h. <em>Você abre, a IA resume.</em>
           </h1>
 
           <div className="hero-intro rise d2">
             <p className="lead">
-              Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
-              prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
+              Para quem vende ao governo. Todo dia, as licitações novas do seu ramo e dos seus estados chegam no seu e-mail. Abriu uma? A IA lê o PDF
+              e mostra prazos, documentos e riscos. Você decide rápido se vale disputar.
             </p>
             <div className="hero-cta">
               <LoginForm variante="hero" />
-              <p className="hero-nota">{DIAS_TESTE} dias grátis. Sem senha e sem cartão: você entra pelo link que chega no e-mail.</p>
+              <p className="hero-nota">{DIAS_TESTE} dias grátis, sem cartão. Não tem senha: digite seu e-mail e clique no link que mandamos.</p>
               <Link href="/buscar" className="link-arr">
                 Ver licitações abertas agora, sem cadastro {seta}
               </Link>
@@ -212,7 +206,7 @@ export default function Home() {
                 ))}
               </ol>
             </div>
-            <figcaption>Tela real do Vencedital, com editais publicados no PNCP.</figcaption>
+            <figcaption>A busca do Vencedital, com editais abertos no PNCP.</figcaption>
           </figure>
 
           <div id="hoje" className="cobertura" role="region" aria-labelledby="hoje-h">
@@ -220,7 +214,7 @@ export default function Home() {
               <h2 id="hoje-h" className="kicker vivo">
                 Cobertura do PNCP hoje
               </h2>
-              <span>Lido três vezes por dia, de órgãos municipais, estaduais e federais.</span>
+              <span>O PNCP é lido três vezes por dia, com órgãos municipais, estaduais e federais.</span>
             </div>
             <div className="numeros">
               <Suspense fallback={<div className="numeros-sk" />}>
@@ -264,7 +258,7 @@ export default function Home() {
               <Suspense fallback={<div style={{ height: 210 }} />}>
                 <Previa />
               </Suspense>
-              <div className="f">Prévia do e-mail diário, com editais reais abertos agora</div>
+              <div className="f">Exemplo do e-mail, com editais abertos agora</div>
             </div>
           </div>
         </div>
@@ -293,36 +287,16 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="sec sec-white" aria-labelledby="rec-h">
-        <div className="container">
-          <div className="sec-head">
-            <Kicker n="03">Recursos</Kicker>
-            <h2 id="rec-h" className="display sec-h">
-              Do edital publicado à proposta enviada, sem planilha.
-            </h2>
-          </div>
-          <div className="recursos">
-            {RECURSOS.map((r, i) => (
-              <article key={r.t} className="reveal">
-                <span className="n">0{i + 1}</span>
-                <h3>{r.t}</h3>
-                <p>{r.d}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="sec sec-sand" aria-labelledby="mercado-h">
         <div className="container mercado">
           <div>
-            <Kicker n="04">Mercado</Kicker>
+            <Kicker n="03">Mercado</Kicker>
             <h2 id="mercado-h" className="display sec-h">
               Antes de dar o preço, veja quem já ganhou
             </h2>
           </div>
           <div className="mercado-body">
-            <p>Cada órgão e cada fornecedor do PNCP tem uma página: o que comprou, de quem, em que faixa de valor e com que frequência.</p>
+            <p>Cada órgão e cada fornecedor do PNCP tem uma página: o que comprou, de quem e por quanto, nos últimos 12 meses.</p>
             <Link className="link-arr" href="/mercado">
               Explorar o mercado {seta}
             </Link>
@@ -333,9 +307,9 @@ export default function Home() {
       <section id="precos" className="sec" aria-labelledby="precos-h">
         <div className="container">
           <div className="sec-head">
-            <Kicker n="05">Preços</Kicker>
+            <Kicker n="04">Preços</Kicker>
             <h2 id="precos-h" className="display sec-h">
-              Preço na tela, sem falar com vendedor
+              Um plano, um preço
             </h2>
           </div>
           <div className="precos">
@@ -359,20 +333,20 @@ export default function Home() {
                 <span>/mês</span>
               </p>
               <ul className="inclui">
-                <li>Até {MAX_ALERTAS} alertas diários</li>
+                <li>Até {MAX_ALERTAS} alertas, num só e-mail por dia</li>
                 <li>{LIMITE_DIARIO} resumos por IA por dia</li>
-                <li>Minhas disputas com checklist</li>
-                <li>Prazos na sua agenda</li>
+                <li>Minhas disputas, com a lista de documentos</li>
+                <li>Prazos no Google Agenda ou Outlook</li>
               </ul>
-              <p className="desc">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa. Nota fiscal todo mês.</p>
+              <p className="desc">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa.</p>
               <Link className="btn btn-light btn-lg" href="/entrar">
                 Começar teste grátis {seta}
               </Link>
             </article>
           </div>
           <p className="fundador">
-            <b>Preço de fundador:</b> as 10 primeiras empresas pagam R$ {PRECO_MENSAL}/mês sem reajuste, enquanto a assinatura estiver ativa. Se desistir
-            em até 7 dias do primeiro pagamento, devolvemos tudo. Ao assinar, você aceita os <Link href="/termos">Termos de Uso</Link>.
+            <b>Preço de fundador:</b> as 10 primeiras empresas pagam R$ {PRECO_MENSAL} por mês, sem reajuste, enquanto a assinatura estiver ativa. Se
+            desistir em até 7 dias depois do primeiro pagamento, devolvemos tudo. Ao assinar, você aceita os <Link href="/termos">Termos de Uso</Link>.
           </p>
         </div>
       </section>
@@ -380,9 +354,9 @@ export default function Home() {
       <section className="sec sec-white" aria-labelledby="faq-h">
         <div className="container faq-grid">
           <div className="faq-side">
-            <Kicker n="06">Dúvidas</Kicker>
+            <Kicker n="05">Dúvidas</Kicker>
             <h2 id="faq-h" className="display sec-h">
-              Perguntas frequentes
+              Antes de começar
             </h2>
           </div>
           <div className="faq">
@@ -407,15 +381,6 @@ export default function Home() {
               Começar teste grátis {seta}
             </Link>
           </div>
-          <p className="assinatura">
-            Feito por Giovani Ohira, da {EMPRESA.razaoSocial}, porque achar licitação hoje é uma planilha e muita paciência.
-            {EMPRESA.contato && (
-              <>
-                {" "}
-                Se o resumo errar ou faltar algo, escreva para <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>: quem responde sou eu.
-              </>
-            )}
-          </p>
         </div>
       </section>
     </main>

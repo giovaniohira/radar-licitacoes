@@ -17,7 +17,7 @@ async function Conta({ searchParams }: PageProps<"/conta">) {
   const ics = `${appUrl}/pipeline.ics?u=${user.id}&t=${icsToken(user.id)}`;
   return (
     <div className="page narrow" style={{ gap: 20 }}>
-      <PageHead title="Conta" sub="Você entra com seu e-mail, sem senha: mandamos um link de acesso a cada login." />
+      <PageHead title="Conta" sub="Não tem senha. Para entrar, você recebe um link no seu e-mail." />
       {first(sp.ok) && <div className="notice ok">E-mail atualizado.</div>}
       {first(sp.erro) && <div className="notice">Não deu para trocar: esse e-mail passou a ter outra conta no Vencedital.</div>}
 

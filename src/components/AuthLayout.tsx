@@ -12,7 +12,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         </div>
       </section>
       <aside className="auth-aside">
-        <h2>Em 2 minutos, seu primeiro alerta pronto.</h2>
+        <h2>Seu primeiro alerta em 4 perguntas.</h2>
         <ol>
           <li>
             <span>1</span>Diga o que sua empresa vende.
@@ -21,7 +21,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
             <span>2</span>Escolha os estados e o tamanho de contrato.
           </li>
           <li>
-            <span>3</span>Amanhã às 7h, os editais novos chegam no seu e-mail.
+            <span>3</span>Todo dia às 7h, os editais novos chegam no seu e-mail.
           </li>
         </ol>
       </aside>

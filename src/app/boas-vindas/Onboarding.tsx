@@ -142,7 +142,7 @@ export function Onboarding({ email }: { email: string }) {
               <p className="k">Passo 4 de 4</p>
               <h1>Seu primeiro alerta</h1>
               <p>
-                Todo dia às 7h, um e-mail para <b>{email}</b> só com os editais que você ainda não recebeu.
+                Todo dia às 7h, se houver edital novo, mandamos um e-mail para <b>{email}</b>. Só com o que você ainda não recebeu.
               </p>
             </div>
             <label className="field" style={{ fontSize: 13, fontWeight: 550 }}>

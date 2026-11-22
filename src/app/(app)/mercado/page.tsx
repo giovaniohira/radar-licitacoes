@@ -88,7 +88,7 @@ async function Mercado({ searchParams }: PageProps<"/mercado">) {
             <Icon name="sparkle" size={20} />
             <p className="body" style={{ fontSize: 14, color: "var(--navy)", lineHeight: 1.5 }}>
               <strong>Em resumo:</strong> metade dos contratos{q ? ` de ${q.split(",")[0].trim()}` : ""} ficou abaixo de {formatBRLCompact(mediana)}
-              {mediana != null && mediana <= 80000 ? ", uma faixa com disputa exclusiva para ME/EPP" : ""}.{" "}
+              {mediana != null && mediana <= 80000 ? ", faixa em que muitos editais são exclusivos para ME/EPP" : ""}.{" "}
               {topo && `${nome(topo.nome)} foi quem mais comprou no período.`}
             </p>
             {nAbertos > 0 && (
