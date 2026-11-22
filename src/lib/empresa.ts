@@ -10,9 +10,9 @@ export const EMPRESA = {
   sede: "Porto Velho-RO" as string | null,
   /** Comarca for clause 12 of the Terms. */
   foro: "Porto Velho-RO" as string | null,
-  /** Public contact and privacy channels. Null until the domain receives mail (MX): an address that bounces is worse than none. */
-  contato: null as string | null,
-  privacidade: null as string | null,
+  /** Public contact and privacy channels (inbound mail forwards via ImprovMX). Set to null to hide them if the inbox goes away: an address that bounces is worse than none. */
+  contato: "contato@vencedital.com.br" as string | null,
+  privacidade: "privacidade@vencedital.com.br" as string | null,
   /** How long database backups are kept, in days (Privacy Policy). Null until backups run. */
   backupDias: null as number | null,
 };
