@@ -161,7 +161,7 @@ export function Onboarding({ email, cnpj: cnpjSalvo }: { email: string; cnpj: st
               <button className="btn btn-ghost">Pular por agora</button>
             </form>
           ) : (
-            <span className="xs subtle" style={{ fontFamily: "var(--mono)", letterSpacing: ".06em", textTransform: "uppercase" }}>
+            <span className="xs subtle" style={{ fontFamily: "var(--mono)", letterSpacing: ".06em", textTransform: "uppercase", minWidth: 0, overflowWrap: "anywhere" }}>
               {email}
             </span>
           )}

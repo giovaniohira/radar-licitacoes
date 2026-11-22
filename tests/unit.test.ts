@@ -516,6 +516,16 @@ describe("CNPJ public data", () => {
     }) as typeof fetch;
     expect(await consultarCnpj("06990590000123", fallback)).toEqual({ razaoSocial: "", municipio: null, uf: "SP", abertura: null, atividade: null, cnaes: ["6201501"] });
     expect(urls[1]).toBe("https://minhareceita.org/06990590000123");
+    // A slow first source eats the 5 s budget: the fallback is not tried past it.
+    const lentas: string[] = [];
+    const lenta = (async (u: string, init?: RequestInit) => {
+      lentas.push(u);
+      return new Promise<Response>((_, fail) => init?.signal?.addEventListener("abort", () => fail(new Error("timeout"))));
+    }) as typeof fetch;
+    const t0 = Date.now();
+    expect(await consultarCnpj("06990590000123", lenta, 300)).toBeNull();
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(lentas).toHaveLength(1);
     const down = (async () => {
       throw new Error("timeout");
     }) as typeof fetch;

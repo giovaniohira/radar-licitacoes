@@ -27,9 +27,13 @@ interface RespostaBrasilApi {
 // Same response shape (Minha Receita is the data source behind BrasilAPI). Without a User-Agent, BrasilAPI answers 403.
 const FONTES = ["https://brasilapi.com.br/api/cnpj/v1/", "https://minhareceita.org/"];
 
-export async function consultarCnpj(cnpj: string, fetchImpl: typeof fetch = fetch, timeoutMs = 4000): Promise<DadosCnpj | null> {
+/** At most `timeoutMs` in total (spec: 5 s), fallback included; after that the onboarding goes on without pre-filling. */
+export async function consultarCnpj(cnpj: string, fetchImpl: typeof fetch = fetch, timeoutMs = 5000): Promise<DadosCnpj | null> {
+  const fim = Date.now() + timeoutMs;
   for (const fonte of FONTES) {
-    const dados = await consultar(fonte + encodeURIComponent(cnpj), fetchImpl, timeoutMs);
+    const resta = fim - Date.now();
+    if (resta < 200) break;
+    const dados = await consultar(fonte + encodeURIComponent(cnpj), fetchImpl, resta);
     if (dados) return dados;
   }
   return null;
