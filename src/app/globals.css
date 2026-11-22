@@ -761,6 +761,119 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .centro { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
 .centro .card { width: min(420px, 100%); padding: 28px; display: flex; flex-direction: column; gap: 16px; text-align: center; align-items: center; }
 
+/* ---------- Contas: additions to src/app/globals.css (Radar Design, 22/11) ----------
+   Paste this block after the "Entrar" section. It only adds classes; nothing existing changes, except
+   that the ink aside of .auth hides on phones (see the media query at the end). */
+
+/* Sign-up progress in the ink aside: done steps dim, the current one is white with a filled marker. */
+.auth-aside li.atual { color: var(--on-dark); }
+.auth-aside li.atual span { color: var(--ink); background: var(--brand); padding: 1px 4px; }
+.auth-aside li.feito { color: var(--on-ink-subtle); text-decoration: line-through; text-decoration-color: rgb(255 255 255 / 0.25); }
+.auth-aside .nota { max-width: 440px; font-size: 13px; line-height: 1.6; color: var(--on-ink-subtle); }
+
+/* Kicker above the form title ("Passo 1 de 3", "Teste grátis · 14 dias"). Uses .kicker. */
+.auth-box .kicker { margin-bottom: 14px; }
+
+/* Label row with a link on the right ("Senha" ... "Esqueci a senha"). */
+.field-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.field-top a { font-size: 12.5px; font-weight: 500; }
+
+/* Password with a "Mostrar" toggle inside the field. The button is type="button" with aria-pressed. */
+.pw { position: relative; }
+.pw .input { padding-right: 84px; }
+.pw button { position: absolute; top: 1px; right: 1px; bottom: 1px; padding: 0 14px; border: 0; border-left: 1px solid var(--border); background: transparent; font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); cursor: pointer; }
+.pw button:hover { color: var(--text); background: var(--bg); }
+.pw button[aria-pressed="true"] { color: var(--brand-text); }
+
+/* "ou" divider between password sign-in and the e-mail link. */
+.ou { display: flex; align-items: center; gap: 14px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); }
+.ou::before, .ou::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* Footer line of the auth box ("Já tem conta? Entrar"). */
+.auth-alt { padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+.auth-alt a { font-weight: 550; }
+/* A button that reads as a link (actions that stay on the page, like "Voltar para entrar com senha"). */
+.link-btn { all: unset; cursor: pointer; color: var(--brand-text); font-weight: 550; }
+.link-btn:hover { text-decoration: underline; }
+.link-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.link-btn:disabled { cursor: default; color: var(--subtle); text-decoration: none; }
+
+/* Field error under an input: red text with the orange square swapped for a red one. */
+.field .erro { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--danger); }
+.field .erro::before { content: ""; width: 6px; height: 6px; flex: none; background: var(--danger); }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.input[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px rgb(180 35 24 / 0.18); }
+
+/* "Confirme seu e-mail": the address in a mono chip, a shortcut to the mail app, resend with countdown. */
+.email-chip { display: block; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); font-family: var(--mono); font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+.reenvio { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; font-size: 13.5px; color: var(--muted); }
+.reenvio .row { gap: 4px; }
+.reenvio time { font-family: var(--mono); font-size: 12px; color: var(--subtle); }
+.dica { font-size: 13px; line-height: 1.6; color: var(--subtle); }
+/* Live wait: the page moves on by itself when the link is clicked on another device (optional, see spec). */
+.aguardando { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); }
+.aguardando::before { content: ""; width: 6px; height: 6px; flex: none; background: var(--brand); animation: vivo 2.4s ease-in-out infinite; }
+
+/* Onboarding step 1: CNPJ in large mono digits, with a status at the right edge. */
+.cnpj { position: relative; }
+.cnpj .input { height: 60px; padding: 0 56px 0 18px; font-family: var(--mono); font-size: 22px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.cnpj .input::placeholder { letter-spacing: 0.04em; }
+.cnpj .st { position: absolute; right: 18px; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 22px; height: 22px; color: var(--ok); }
+.cnpj .st.busy::before { content: ""; width: 14px; height: 14px; border: 2px solid var(--brand); border-right-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+
+/* The company found for the CNPJ, to confirm. Orange rule on the left, what we'll pre-fill underneath. */
+.empresa { display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; background: var(--surface); border: 1px solid var(--border); box-shadow: inset 2px 0 0 var(--brand); }
+.empresa .nome { font-family: var(--serif); font-size: 26px; font-weight: 400; letter-spacing: -0.015em; line-height: 1.15; }
+.empresa .meta { font-size: 13.5px; color: var(--muted); }
+.empresa dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.empresa dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); padding-top: 2px; }
+.empresa dd { margin: 0; color: var(--text); }
+.empresa .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (prefers-reduced-motion: no-preference) { .empresa { animation: rise 0.5s var(--ease) both; } }
+
+/* "Sugerido pelo CNPJ" / "do seu histórico": tiny tag on pre-filled cards, chips and keywords. */
+.sug { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 9.5px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-text); white-space: nowrap; }
+.sug::before { content: ""; width: 5px; height: 5px; background: var(--brand); }
+.onb-card .sug { margin-top: 6px; }
+.uf-chips .sug-uf + span { box-shadow: inset 0 -2px 0 var(--brand); }
+
+/* Onboarding step 2 is one screen: ramo, estados and tamanho as ruled blocks. */
+.bloco { display: flex; flex-direction: column; gap: 14px; padding-top: 22px; border-top: 1px solid var(--border); }
+.bloco > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; }
+.bloco h2 { font-size: 15px; font-weight: 600; }
+.bloco header p { font-size: 13px; color: var(--subtle); }
+.onb-cards.compacto { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.onb-cards.compacto .onb-card { padding: 12px 14px; }
+.onb-cards.compacto .onb-card b { font-size: 14px; }
+/* Tamanho do contrato as a segmented row instead of a whole step. */
+.seg.faixas { display: flex; flex-wrap: wrap; width: fit-content; }
+.seg.faixas label { position: relative; }
+.seg.faixas input { position: absolute; opacity: 0; pointer-events: none; }
+.seg.faixas span { height: 34px; padding: 0 14px; display: inline-flex; align-items: center; border-radius: var(--r); font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.seg.faixas input:checked + span { background: var(--surface); color: var(--text); font-weight: 550; box-shadow: 0 0 0 1px var(--border-strong); }
+.seg.faixas input:focus-visible + span { outline: 2px solid var(--brand); }
+
+/* Live preview with checkboxes: the old step 4 list lives here now (pick editais while you set the alert). */
+.previa .e.pick { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; cursor: pointer; }
+.previa .e.pick:hover { background: var(--bg); }
+.previa .e.pick input { margin-top: 2px; }
+.previa .e.pick .v { text-align: right; font-size: 12px; color: var(--subtle); font-variant-numeric: tabular-nums; }
+.previa .e.pick .v b { display: block; font-size: 13px; color: var(--text); }
+
+/* Phones: the ink aside is decoration, so it goes away and the kicker carries the progress. The
+   onboarding stepper shortens to bars only, with the current step name in the kicker. */
+@media (max-width: 720px) {
+  .auth-aside { display: none; }
+  .auth-main { padding-bottom: 40px; }
+  .auth-box { align-items: flex-start; padding: 40px 0 0; }
+  .auth-box h1 { font-size: 34px; }
+  .onb-top .stepper span { display: none; }
+  .onb-top .stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1 1 100%; order: 3; }
+  .cnpj .input { font-size: 19px; }
+  .onb-nav { position: sticky; bottom: 0; z-index: 5; margin: 0 calc(-1 * clamp(16px, 3vw, 32px)); padding: 12px clamp(16px, 3vw, 32px); background: rgb(246 244 239 / 0.92); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .onb-nav .btn-primary { flex: 1; }
+}
+
 /* ---------- Boas-vindas ---------- */
 .onb { min-height: 100vh; font-size: 15px; }
 .onb-top { background: var(--surface); border-bottom: 1px solid var(--border); }

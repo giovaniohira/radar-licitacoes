@@ -1,8 +1,24 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { hashToken, icsToken, newLoginToken, normalizeEmail, signSession, verifyIcsToken, verifySession } from "@/lib/auth";
+import {
+  formatCnpj,
+  hashSenha,
+  hashToken,
+  icsToken,
+  newLoginToken,
+  normalizeCnpj,
+  normalizeEmail,
+  parseIdentificador,
+  problemaSenha,
+  signSession,
+  verificarSenha,
+  verifyIcsToken,
+  verifySession,
+} from "@/lib/auth";
 import { AVISO_DIGEST, renderDigest, type Alert } from "@/lib/alerts";
+import { mascaraCnpj } from "@/lib/cnpj";
+import { consultarCnpj, formatCnae, palavrasDoHistorico, setoresDoCnae, setoresSugeridos } from "@/lib/cnpj-publico";
 import { quemSomos } from "@/lib/empresa";
 import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
@@ -10,7 +26,10 @@ import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
 import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
 import { minimoDePalavras, prefiltroGin, termosDoObjeto } from "@/lib/quemganhou";
-import { PRIVADAS, robotsFor } from "@/lib/robots";
+import { aplicativo, faq, landing, organizacao, serializar, trilha } from "@/lib/schema";
+import { FILTRADAS, PRIVADAS, ROBOS_IA_BUSCA, ROBOS_IA_TREINO, robotsFor } from "@/lib/robots";
+import nextConfig from "../next.config";
+import { tituloEdital } from "@/lib/seo";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
 
 const KEY = "k".repeat(40);
@@ -42,6 +61,55 @@ describe("session", () => {
   it("normalizes e-mails", () => {
     expect(normalizeEmail("  Fulano@Empresa.COM.br ")).toBe("fulano@empresa.com.br");
     expect(normalizeEmail("sem-arroba")).toBeNull();
+  });
+});
+
+describe("passwords", () => {
+  it("hashes with a fresh salt and verifies", async () => {
+    const a = await hashSenha("cafe com leite 2026");
+    const b = await hashSenha("cafe com leite 2026");
+    expect(a).toMatch(/^scrypt\$32768\$8\$1\$[\w-]{22}\$[\w-]{43}$/);
+    expect(a).not.toBe(b);
+    expect(a).not.toContain("cafe");
+    expect(await verificarSenha("cafe com leite 2026", a)).toBe(true);
+    expect(await verificarSenha("cafe com leite 2025", a)).toBe(false);
+    expect(await verificarSenha("", a)).toBe(false);
+  });
+  it("always fails without a stored hash, or with a malformed one", async () => {
+    expect(await verificarSenha("qualquer", null)).toBe(false);
+    expect(await verificarSenha("qualquer", undefined)).toBe(false);
+    expect(await verificarSenha("qualquer", "lixo")).toBe(false);
+  });
+  it("treats composed and decomposed accents as the same password", async () => {
+    const h = await hashSenha("açaí gelado");
+    expect(await verificarSenha("açaí gelado".normalize("NFD"), h)).toBe(true);
+  });
+  it("only checks length", () => {
+    expect(problemaSenha("curta")).toMatch(/8 caracteres/);
+    expect(problemaSenha("12345678")).toBeNull();
+    expect(problemaSenha("x".repeat(201))).toMatch(/200/);
+  });
+});
+
+describe("CNPJ", () => {
+  it("validates check digits with or without punctuation", () => {
+    expect(normalizeCnpj("68.631.511/0001-45")).toBe("68631511000145");
+    expect(normalizeCnpj(" 68631511000145 ")).toBe("68631511000145");
+    expect(normalizeCnpj("68.631.511/0001-46")).toBeNull();
+    expect(normalizeCnpj("11.111.111/1111-11")).toBeNull();
+    expect(normalizeCnpj("6863151100014")).toBeNull();
+  });
+  it("accepts the alphanumeric format (Receita example 12.ABC.345/01DE-35)", () => {
+    expect(normalizeCnpj("12.abc.345/01de-35")).toBe("12ABC34501DE35");
+    expect(normalizeCnpj("12.ABC.345/01DE-36")).toBeNull();
+    expect(normalizeCnpj("12.ABC.345/01DE-3A")).toBeNull();
+    expect(formatCnpj("12ABC34501DE35")).toBe("12.ABC.345/01DE-35");
+  });
+  it("reads the single sign-in field as e-mail or CNPJ", () => {
+    expect(parseIdentificador(" Fulano@Empresa.com ")).toEqual({ tipo: "email", valor: "fulano@empresa.com" });
+    expect(parseIdentificador("68.631.511/0001-45")).toEqual({ tipo: "cnpj", valor: "68631511000145" });
+    expect(parseIdentificador("68.631.511/0001-40")).toBeNull();
+    expect(parseIdentificador("fulano@")).toBeNull();
   });
 });
 
@@ -283,16 +351,78 @@ describe("destacar", () => {
 });
 
 describe("robots", () => {
-  it("disallows the private routes at a domain root", () => {
+  const grupos = (r: ReturnType<typeof robotsFor>) => (Array.isArray(r.rules) ? r.rules : [r.rules]);
+
+  it("disallows the private routes and the filtered listings at a domain root", () => {
     const r = robotsFor("https://exemplo.com.br");
     expect(r.sitemap).toBe("https://exemplo.com.br/sitemap.xml");
-    expect(r.rules).toEqual({ userAgent: "*", allow: "/", disallow: PRIVADAS });
+    expect(grupos(r)[0]).toEqual({ userAgent: "*", allow: "/", disallow: [...PRIVADAS, ...FILTRADAS] });
+  });
+
+  it("names every AI crawler and repeats the same paths for them", () => {
+    const [geral, ia] = grupos(robotsFor("https://exemplo.com.br"));
+    expect(ia.userAgent).toEqual(expect.arrayContaining(["GPTBot", "OAI-SearchBot", "ClaudeBot", "PerplexityBot", "Google-Extended"]));
+    expect({ allow: ia.allow, disallow: ia.disallow }).toEqual({ allow: geral.allow, disallow: geral.disallow });
   });
 
   it("prefixes every path under a sub-path deploy", () => {
     const r = robotsFor("https://apps.giovaniohira.com/radar/");
     expect(r.sitemap).toBe("https://apps.giovaniohira.com/radar/sitemap.xml");
-    expect(r.rules).toMatchObject({ allow: "/radar/", disallow: expect.arrayContaining(["/radar/painel", "/radar/entrar/confirmar"]) });
+    expect(grupos(r)[0]).toMatchObject({ allow: "/radar/", disallow: expect.arrayContaining(["/radar/painel", "/radar/entrar", "/radar/buscar?"]) });
+  });
+});
+
+describe("htmlLimitedBots", () => {
+  const re = nextConfig.htmlLimitedBots as RegExp;
+
+  it("puts the metadata in the <head> for every AI crawler named in robots.txt", () => {
+    for (const bot of [...ROBOS_IA_BUSCA, ...ROBOS_IA_TREINO]) expect(re.test(`Mozilla/5.0 (compatible; ${bot}/1.0)`), bot).toBe(true);
+    expect(re.test("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")).toBe(true);
+  });
+
+  it("keeps the crawlers Next already covered, and leaves people alone", () => {
+    for (const ua of ["Bingbot/2.0", "facebookexternalhit/1.1", "Twitterbot/1.0", "WhatsApp/2", "LinkedInBot/1.0"]) expect(re.test(ua), ua).toBe(true);
+    expect(re.test("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120 Safari/537.36")).toBe(false);
+  });
+});
+
+describe("schema.org", () => {
+  const base = "https://exemplo.com.br";
+  const perguntas = [{ q: "Quanto custa?", a: "R$ 97 por mês." }, { q: "Preciso de senha?", a: "Não <b>precisa</b>." }];
+
+  it("states the real price and the company, and never a rating or a review", () => {
+    const g = landing(base, perguntas);
+    const txt = JSON.stringify(g);
+    expect(txt).not.toMatch(/aggregateRating|ratingValue|"review"|reviewCount/i);
+    const app = aplicativo(base) as { offers: { price: string; priceCurrency: string; priceSpecification: { billingDuration: string } } };
+    expect(app.offers).toMatchObject({ price: "97.00", priceCurrency: "BRL", priceSpecification: { billingDuration: "P1M" } });
+    expect(organizacao(base)).toMatchObject({ name: "Vencedital", legalName: expect.stringMatching(/^OHIRA TECNOLOGIA LTDA/) });
+    expect(g["@graph"]).toHaveLength(4);
+  });
+
+  it("mirrors the FAQ question for question", () => {
+    const f = faq(base, perguntas) as { mainEntity: { name: string; acceptedAnswer: { text: string } }[] };
+    expect(f.mainEntity.map((m) => [m.name, m.acceptedAnswer.text])).toEqual(perguntas.map((p) => [p.q, p.a]));
+  });
+
+  it("numbers the breadcrumb from 1 with absolute URLs", () => {
+    const t = trilha(base, [{ nome: "Mercado", path: "/mercado" }, { nome: "Município X", path: "/orgao/123" }]) as { itemListElement: { position: number; item: string }[] };
+    expect(t.itemListElement).toEqual([
+      expect.objectContaining({ position: 1, item: `${base}/mercado` }),
+      expect.objectContaining({ position: 2, item: `${base}/orgao/123` }),
+    ]);
+  });
+
+  it("cannot close the script tag from inside a string", () => {
+    expect(serializar({ nome: "</script><script>alert(1)</script>" })).not.toContain("<");
+    expect(JSON.parse(serializar({ nome: "a<b" }))).toEqual({ nome: "a<b" });
+  });
+});
+
+describe("edital title", () => {
+  it("drops a stray leading dash and keeps the title short", () => {
+    expect(tituloEdital("- Contratação de empresa para readequação de rede", 60)).not.toMatch(/^-/);
+    expect(tituloEdital("Aquisição de pneus ".repeat(10), 60).length).toBeLessThanOrEqual(61);
   });
 });
 
@@ -339,5 +469,74 @@ describe("quem ganhou: palavras do objeto", () => {
     // Every pair has one of the two leading words, so a contract that matches only trailing words is never required.
     expect(prefiltroGin(["aaaa", "bbbb", "cccc", "dddd"])).toBe("(aaaa & bbbb) | (aaaa & cccc) | (aaaa & dddd) | (bbbb & cccc) | (bbbb & dddd)");
     expect(prefiltroGin([])).toBe("");
+  });
+});
+
+describe("CNPJ public data", () => {
+  it("keeps the city, opening year and activity", async () => {
+    const f = (async () =>
+      new Response(JSON.stringify({ razao_social: "PADARIA X LTDA", municipio: "PORTO VELHO", uf: "RO", data_inicio_atividade: "2014-03-02", cnae_fiscal_descricao: "Fabricação de produtos de panificação", cnae_fiscal: 1091102 }))) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", f)).toMatchObject({ municipio: "PORTO VELHO", abertura: 2014, atividade: "Fabricação de produtos de panificação", cnaes: ["1091102"] });
+    expect(formatCnae("1091102")).toBe("1091-1/02");
+  });
+  it("picks words that repeat across the contracts a company won", () => {
+    const objetos = [
+      "Aquisição de gêneros alimentícios para a merenda escolar",
+      "Registro de preços para fornecimento de pães e gêneros alimentícios",
+      "Merenda escolar: pães, bolos e biscoitos",
+      "Contratação de empresa especializada em coffee break",
+    ];
+    expect(palavrasDoHistorico(objetos)).toEqual(["alimentícios", "escolar", "gêneros"]);
+    expect(palavrasDoHistorico(objetos, 5)).toEqual(["alimentícios", "escolar", "gêneros", "merenda"]);
+    expect(palavrasDoHistorico(["Uma compra só"])).toEqual([]);
+  });
+  it("suggests the strongest sectors: main CNAE and the words of the company's own contracts", () => {
+    // Hospital distributor: a secondary CNAE also matches "limpeza", but its contracts say medicamentos.
+    expect(setoresSugeridos(["4645101", "4649408"], ["medicamentos", "suplementos"])).toEqual(["saude"]);
+    // Mixed distributor: no main match; the most frequent contract word decides the order.
+    expect(setoresSugeridos(["8211300", "4647801", "4639701", "4649408"], ["expediente", "escolar", "limpeza"])).toEqual(["escritorio", "alimentos"]);
+    // No history: CNAE alone, main first, a secondary one next to it.
+    expect(setoresSugeridos(["4751201", "8121400"], [])).toEqual(["ti", "limpeza"]);
+    expect(setoresSugeridos([], [])).toEqual([]);
+  });
+  it("masks a CNPJ while it is typed", () => {
+    expect(mascaraCnpj("6863")).toBe("68.63");
+    expect(mascaraCnpj("68631511000145")).toBe("68.631.511/0001-45");
+    expect(mascaraCnpj("12abc34501de35xx")).toBe("12.ABC.345/01DE-35");
+  });
+  it("maps CNAE classes to onboarding sectors, main activity first", () => {
+    expect(setoresDoCnae(["8121400", "4751201"])).toEqual(["limpeza", "ti"]);
+    expect(setoresDoCnae(["6319400", "4751201", "6201501"])).toEqual(["ti"]);
+    expect(setoresDoCnae(["0111301"])).toEqual([]);
+    expect(setoresDoCnae([])).toEqual([]);
+  });
+  it("reads state and CNAEs, and returns null on any failure", async () => {
+    const ok = (async () =>
+      new Response(JSON.stringify({ razao_social: "EMPRESA X LTDA", uf: "RO", cnae_fiscal: 4751201, cnaes_secundarios: [{ codigo: 0 }, { codigo: 8121400 }] }))) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", ok)).toEqual({ razaoSocial: "EMPRESA X LTDA", municipio: null, uf: "RO", abertura: null, atividade: null, cnaes: ["4751201", "8121400"] });
+    const notFound = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", notFound)).toBeNull();
+    // First source refuses, the fallback answers.
+    const urls: string[] = [];
+    const fallback = (async (u: string) => {
+      urls.push(u);
+      return urls.length === 1 ? new Response("Forbidden", { status: 403 }) : new Response(JSON.stringify({ uf: "SP", cnae_fiscal: "6201-5/01" }));
+    }) as typeof fetch;
+    expect(await consultarCnpj("06990590000123", fallback)).toEqual({ razaoSocial: "", municipio: null, uf: "SP", abertura: null, atividade: null, cnaes: ["6201501"] });
+    expect(urls[1]).toBe("https://minhareceita.org/06990590000123");
+    // A slow first source eats the 5 s budget: the fallback is not tried past it.
+    const lentas: string[] = [];
+    const lenta = (async (u: string, init?: RequestInit) => {
+      lentas.push(u);
+      return new Promise<Response>((_, fail) => init?.signal?.addEventListener("abort", () => fail(new Error("timeout"))));
+    }) as typeof fetch;
+    const t0 = Date.now();
+    expect(await consultarCnpj("06990590000123", lenta, 300)).toBeNull();
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(lentas).toHaveLength(1);
+    const down = (async () => {
+      throw new Error("timeout");
+    }) as typeof fetch;
+    expect(await consultarCnpj("68631511000145", down)).toBeNull();
   });
 });

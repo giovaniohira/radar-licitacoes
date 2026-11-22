@@ -4,12 +4,15 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
+import { JsonLd } from "@/components/JsonLd";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Loading, PrazoPill, editalHref, type EditalLinha } from "@/components/ui";
 import { pool, query } from "@/lib/db";
-import { formatBRL, formatCNPJ, formatData, frase, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { formatBRL, formatCNPJ, formatData, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { fetchArquivos, pncpUrl, type EditalRow } from "@/lib/pncp";
 import { cardDetalhe, type Etapa } from "@/lib/pipeline";
+import { siteUrl, trilha } from "@/lib/schema";
+import { tituloEdital } from "@/lib/seo";
 import { currentUser } from "@/lib/session";
 import type { Resumo } from "@/lib/summary";
 import { adicionarAoPipeline, mudarEtapa, removerDoPipeline } from "../../../actions/pipeline";
@@ -25,8 +28,11 @@ const getEdital = cache(async (id: string) => (await query<Edital>(`select * fro
 export async function generateMetadata({ params }: PageProps<"/edital/[id]">): Promise<Metadata> {
   const id = decodeURIComponent((await params).id);
   const e = await getEdital(id);
-  if (!e) return { title: "Edital não encontrado" };
-  const title = tituloCurto(frase(e.objeto), 70);
+  // A real 404 for crawlers that get the metadata before the body (see htmlLimitedBots); the page body keeps its own notFound().
+  if (!e) notFound();
+  // What is bought and where: the same object text is repeated across buyers, the place is what tells the pages apart.
+  const lugar = local(e.municipio, e.uf) || nome(e.orgao);
+  const title = `${tituloEdital(e.objeto, 60)} · ${lugar}`;
   const description = [
     `${nome(e.orgao)}${e.uf ? `, ${e.uf}` : ""}`,
     `Valor estimado: ${formatBRL(e.valor_estimado)}`,
@@ -304,6 +310,7 @@ async function Edital({ params }: PageProps<"/edital/[id]">) {
 
   return (
     <div className="page" style={{ gap: 20 }}>
+      <JsonLd data={trilha(siteUrl(), [{ nome: "Encontrar editais", path: "/buscar" }, { nome: tituloEdital(e.objeto, 80), path: editalHref(e.id) }])} />
       <nav className="crumbs" aria-label="Você está em">
         {p ? <Link href="/pipeline">Minhas disputas</Link> : <Link href="/buscar">Encontrar editais</Link>}
         <span>/</span>

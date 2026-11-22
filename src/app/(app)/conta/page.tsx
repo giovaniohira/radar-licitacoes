@@ -2,11 +2,12 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Loading, PageHead } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { icsToken } from "@/lib/auth";
+import { formatCnpj, icsToken } from "@/lib/auth";
+import { query } from "@/lib/db";
 import { first } from "@/lib/params";
 import { requireUser } from "@/lib/session";
 import { excluirConta, sairDeTodos } from "../../actions/auth";
-import { CopiarAgenda, TrocarEmail } from "./TrocarEmail";
+import { CopiarAgenda, SalvarCnpj, TrocarEmail, TrocarSenha } from "./TrocarEmail";
 
 export const metadata: Metadata = { title: "Conta", robots: { index: false } };
 
@@ -15,9 +16,10 @@ async function Conta({ searchParams }: PageProps<"/conta">) {
   const sp = await searchParams;
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
   const ics = `${appUrl}/pipeline.ics?u=${user.id}&t=${icsToken(user.id)}`;
+  const [conta] = await query<{ tem_senha: boolean; cnpj: string | null }>(`select senha_hash is not null as tem_senha, cnpj from users where id = $1`, [user.id]);
   return (
     <div className="page narrow" style={{ gap: 20 }}>
-      <PageHead title="Conta" sub="Não tem senha. Para entrar, você recebe um link no seu e-mail." />
+      <PageHead title="Conta" sub="Você entra com e-mail ou CNPJ e senha, ou com um link no seu e-mail." />
       {first(sp.ok) && <div className="notice ok">E-mail atualizado.</div>}
       {first(sp.erro) && <div className="notice">Não deu para trocar: esse e-mail passou a ter outra conta no Vencedital.</div>}
 
@@ -28,6 +30,30 @@ async function Conta({ searchParams }: PageProps<"/conta">) {
         <div className="sec-body vert">
           <p className="small muted">É para onde vão os links de acesso e o e-mail diário dos alertas, às 7h. Para trocar, confirme o novo endereço pelo link que mandamos para ele.</p>
           <TrocarEmail atual={user.email} />
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2>Senha</h2>
+        </div>
+        <div className="sec-body vert">
+          <p className="small muted">
+            {conta?.tem_senha
+              ? "Trocar a senha desconecta os outros aparelhos."
+              : "Sua conta ainda não tem senha: você entra pelo link no e-mail. Crie uma para entrar direto com e-mail ou CNPJ."}
+          </p>
+          <TrocarSenha temSenha={!!conta?.tem_senha} email={user.email} />
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2>CNPJ da empresa</h2>
+        </div>
+        <div className="sec-body vert">
+          <p className="small muted">Com o CNPJ salvo, você pode entrar digitando ele no lugar do e-mail.</p>
+          <SalvarCnpj atual={conta?.cnpj ? formatCnpj(conta.cnpj) : ""} />
         </div>
       </section>
 

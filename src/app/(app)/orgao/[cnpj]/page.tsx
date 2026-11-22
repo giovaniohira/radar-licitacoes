@@ -4,10 +4,12 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { HBars, ListaRanking, iniciais } from "@/components/charts";
+import { JsonLd } from "@/components/JsonLd";
 import { EditalRow, EditalRows, Empty, Interesse, Kpi, Loading, type EditalLinha } from "@/components/ui";
 import { pool, query } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, local, nome, prazo } from "@/lib/format";
 import { analisar, orgaoInfo } from "@/lib/mercado";
+import { siteUrl, trilha } from "@/lib/schema";
 import { currentUser } from "@/lib/session";
 
 const getOrgao = cache((cnpj: string) => orgaoInfo(pool(), cnpj));
@@ -15,7 +17,8 @@ const getOrgao = cache((cnpj: string) => orgaoInfo(pool(), cnpj));
 export async function generateMetadata({ params }: PageProps<"/orgao/[cnpj]">): Promise<Metadata> {
   const cnpj = (await params).cnpj.replace(/\D/g, "");
   const info = await getOrgao(cnpj);
-  if (!info) return { title: "Órgão não encontrado" };
+  // A real 404 for crawlers that get the metadata before the body (see htmlLimitedBots); the page body keeps its own notFound().
+  if (!info) notFound();
   const title = nome(info.nome);
   const description = `Editais abertos, contratos dos últimos 12 meses e fornecedores que mais vendem para ${title} (${local(info.municipio, info.uf) || "Brasil"}).`;
   return { title, description, alternates: { canonical: `/orgao/${cnpj}` }, openGraph: { title, description } };
@@ -48,6 +51,7 @@ async function Orgao({ params }: PageProps<"/orgao/[cnpj]">) {
 
   return (
     <div className="page" style={{ gap: 20 }}>
+      <JsonLd data={trilha(siteUrl(), [{ nome: "Mercado", path: "/mercado" }, { nome: nome(info.nome), path: `/orgao/${cnpj}` }])} />
       <nav className="crumbs" aria-label="Você está em">
         <Link href="/mercado">Mercado</Link>
         <span>/</span>

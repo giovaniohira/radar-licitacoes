@@ -14,7 +14,12 @@ import { first, withParams } from "@/lib/params";
 import { buildSearch } from "@/lib/search";
 import { SETORES, UFS } from "@/lib/setores";
 
-export const metadata: Metadata = { title: "Mercado" };
+// Static on purpose, like /buscar: filtered URLs share this canonical and robots.txt keeps crawlers off "/mercado?".
+export const metadata: Metadata = {
+  title: "Quem compra e quem vence nas licitações do PNCP",
+  description: "Contratos publicados no PNCP por órgão, fornecedor e valor: quem mais compra, quem mais vence e o contrato mediano, por ramo e estado.",
+  alternates: { canonical: "/mercado" },
+};
 
 // One analysis reads ~500k contracts and takes ~30 s on the production database (0.5 CPU). Contracts only
 // change at the 06h ingest, so each filter combination is cached for an hour and refreshed in the background:

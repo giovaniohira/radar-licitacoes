@@ -26,7 +26,7 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
             <Link className="btn btn-ghost" href="/entrar">
               Entrar
             </Link>
-            <Link className="btn btn-light" href="/entrar">
+            <Link className="btn btn-light" href="/criar-conta">
               Começar teste grátis <Icon name="arrowRight" size={14} className="arr" />
             </Link>
           </div>

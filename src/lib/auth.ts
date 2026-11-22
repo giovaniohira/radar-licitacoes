@@ -1,8 +1,16 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "node:crypto";
+import { normalizeCnpj } from "./cnpj";
+
+export { formatCnpj, normalizeCnpj } from "./cnpj";
 
 export const SESSION_COOKIE = "radar_sessao";
 export const SESSION_DAYS = 30;
 export const LOGIN_TOKEN_MINUTES = 20;
+/** The sign-up confirmation link: long enough to open the inbox tomorrow morning. */
+export const VERIFY_TOKEN_MINUTES = 24 * 60;
+export const RESET_TOKEN_MINUTES = 30;
+export const SENHA_MIN = 8;
+export const SENHA_MAX = 200;
 
 function secret(): string {
   const s = process.env.SESSION_SECRET;
@@ -57,4 +65,53 @@ export function hashToken(token: string): string {
 export function normalizeEmail(email: string): string | null {
   const e = email.trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254 ? e : null;
+}
+
+// --- Passwords: scrypt from node:crypto, stored as "scrypt$N$r$p$salt$key" (base64url). ---
+
+const SCRYPT = { N: 2 ** 15, r: 8, p: 1, keylen: 32 };
+
+function scryptAsync(senha: string, salt: Buffer, keylen: number, opts: ScryptOptions): Promise<Buffer> {
+  // maxmem must exceed 128 * N * r (32 MiB at N=2^15, r=8), which is Node's default ceiling.
+  return new Promise((ok, fail) => scrypt(senha.normalize("NFKC"), salt, keylen, { ...opts, maxmem: 96 * 1024 * 1024 }, (e, k) => (e ? fail(e) : ok(k))));
+}
+
+/** Plain-language problem with a new password, or null if it is acceptable. No composition rules: length is what matters. */
+export function problemaSenha(senha: string): string | null {
+  if (senha.length < SENHA_MIN) return `A senha precisa ter pelo menos ${SENHA_MIN} caracteres.`;
+  if (senha.length > SENHA_MAX) return `A senha pode ter no máximo ${SENHA_MAX} caracteres.`;
+  return null;
+}
+
+export async function hashSenha(senha: string): Promise<string> {
+  const salt = randomBytes(16);
+  const { N, r, p, keylen } = SCRYPT;
+  const key = await scryptAsync(senha, salt, keylen, { N, r, p });
+  return `scrypt$${N}$${r}$${p}$${salt.toString("base64url")}$${key.toString("base64url")}`;
+}
+
+// Hashed once, lazily: checked when the account does not exist (or has no password) so the response takes as long as a real check.
+let dummy: Promise<string> | undefined;
+
+/** Constant-time check. A null hash (no account, or a link-only account) always fails after the same amount of work. */
+export async function verificarSenha(senha: string, armazenado: string | null | undefined): Promise<boolean> {
+  const alvo = armazenado ?? (await (dummy ??= hashSenha(randomBytes(16).toString("hex"))));
+  const [alg, n, r, p, salt, key] = alvo.split("$");
+  if (alg !== "scrypt" || !salt || !key) return false;
+  const esperado = Buffer.from(key, "base64url");
+  const got = await scryptAsync(senha.slice(0, SENHA_MAX), Buffer.from(salt, "base64url"), esperado.length, { N: Number(n), r: Number(r), p: Number(p) });
+  return timingSafeEqual(esperado, got) && armazenado != null;
+}
+
+export type Identificador = { tipo: "email"; valor: string } | { tipo: "cnpj"; valor: string };
+
+/** The single "E-mail ou CNPJ" sign-in field: anything with an @ is an e-mail, the rest must be a valid CNPJ. */
+export function parseIdentificador(input: string): Identificador | null {
+  const s = input.trim();
+  if (s.includes("@")) {
+    const email = normalizeEmail(s);
+    return email ? { tipo: "email", valor: email } : null;
+  }
+  const cnpj = normalizeCnpj(s);
+  return cnpj ? { tipo: "cnpj", valor: cnpj } : null;
 }

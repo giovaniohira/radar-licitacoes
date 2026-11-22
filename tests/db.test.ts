@@ -115,7 +115,7 @@ describe.skipIf(!url)("database", () => {
 
   it("upserts contracts and answers market questions", async () => {
     const db = pool();
-    const recent = contratos.map((c) => ({ ...c, dataPublicacaoPncp: new Date().toISOString().slice(0, 19) }));
+    const recent = contratos.map((c) => ({ ...c, dataPublicacaoPncp: new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 19) })); // 3 days back: "now" without a time zone lands in the next week on Sunday nights (Brasília)
     expect(await upsertContratos(db, recent)).toEqual({ inseridos: recent.length, atualizados: 0 });
     expect(await upsertContratos(db, recent)).toEqual({ inseridos: 0, atualizados: 0 });
     const [{ raw }] = (await db.query(`select raw from contratos where tipo_pessoa = 'PF'`)).rows;
