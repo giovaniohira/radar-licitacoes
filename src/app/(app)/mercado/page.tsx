@@ -12,9 +12,16 @@ import { formatBRL, formatBRLCompact, formatInt, nome } from "@/lib/format";
 import { PERIODOS, analisar } from "@/lib/mercado";
 import { first, withParams } from "@/lib/params";
 import { buildSearch } from "@/lib/search";
+import { metadataListagem } from "@/lib/seo";
 import { SETORES, UFS } from "@/lib/setores";
 
-export const metadata: Metadata = { title: "Mercado" };
+export async function generateMetadata({ searchParams }: PageProps<"/mercado">): Promise<Metadata> {
+  return metadataListagem(await searchParams, {
+    path: "/mercado",
+    title: "Quem compra e quem vence nas licitações do PNCP",
+    description: "Contratos publicados no PNCP por órgão, fornecedor e valor: quem mais compra, quem mais vence e o contrato mediano, por ramo e estado.",
+  });
+}
 
 // One analysis reads ~500k contracts and takes ~30 s on the production database (0.5 CPU). Contracts only
 // change at the 06h ingest, so each filter combination is cached for an hour and refreshed in the background:

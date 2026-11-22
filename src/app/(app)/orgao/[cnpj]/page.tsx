@@ -17,7 +17,8 @@ const getOrgao = cache((cnpj: string) => orgaoInfo(pool(), cnpj));
 export async function generateMetadata({ params }: PageProps<"/orgao/[cnpj]">): Promise<Metadata> {
   const cnpj = (await params).cnpj.replace(/\D/g, "");
   const info = await getOrgao(cnpj);
-  if (!info) return { title: "Órgão não encontrado" };
+  // A real 404 for crawlers that get the metadata before the body (see htmlLimitedBots); the page body keeps its own notFound().
+  if (!info) notFound();
   const title = nome(info.nome);
   const description = `Editais abertos, contratos dos últimos 12 meses e fornecedores que mais vendem para ${title} (${local(info.municipio, info.uf) || "Brasil"}).`;
   return { title, description, alternates: { canonical: `/orgao/${cnpj}` }, openGraph: { title, description } };

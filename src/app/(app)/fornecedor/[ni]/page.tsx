@@ -16,7 +16,8 @@ const getFornecedor = cache((ni: string) => fornecedorInfo(pool(), ni));
 export async function generateMetadata({ params }: PageProps<"/fornecedor/[ni]">): Promise<Metadata> {
   const ni = (await params).ni.replace(/\D/g, "");
   const info = ni.length === 14 ? await getFornecedor(ni) : null;
-  if (!info) return { title: "Fornecedor não encontrado" };
+  // A real 404 for crawlers that get the metadata before the body (see htmlLimitedBots); the page body keeps its own notFound().
+  if (!info) notFound();
   const title = nome(info.nome);
   const description = `Contratos com o governo, principais órgãos clientes e o que ${title} (CNPJ ${formatCNPJ(ni)}) vende, com dados do PNCP.`;
   return { title, description, alternates: { canonical: `/fornecedor/${ni}` }, openGraph: { title, description } };
