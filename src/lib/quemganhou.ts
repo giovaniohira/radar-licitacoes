@@ -154,3 +154,9 @@ export async function quemGanhou(db: Pool, cnpj: string, termos: string[], limit
     valorMax: s.vmax,
   };
 }
+
+/** Publication date of the oldest contract we hold, so the empty state says how far back we really look. */
+export async function contratoMaisAntigo(db: Pool): Promise<string | null> {
+  const { rows } = await db.query<{ d: string | null }>(`select min(publicado_em)::text as d from contratos`);
+  return rows[0]?.d ?? null;
+}

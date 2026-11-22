@@ -6,7 +6,7 @@ import { matchesForAlert, sendDigests, type Alert } from "@/lib/alerts";
 import { ingestDia, upsertContratacoes, upsertContratos } from "@/lib/ingest";
 import { analisar, contratosRecentes } from "@/lib/mercado";
 import { addToPipeline, listPipeline, moveCard } from "@/lib/pipeline";
-import { quemGanhou, termosDoObjeto } from "@/lib/quemganhou";
+import { contratoMaisAntigo, quemGanhou, termosDoObjeto } from "@/lib/quemganhou";
 import type { PncpContratacao, PncpContrato, PncpPage } from "@/lib/pncp";
 import { buildSearch, type EditalResumo } from "@/lib/search";
 
@@ -171,6 +171,10 @@ describe.skipIf(!url)("database", () => {
       expect((await quemGanhou(db, A, termosDoObjeto("Reforma de telhado da escola"))).total).toBe(0);
       expect((await quemGanhou(db, A, [])).contratos).toEqual([]);
       expect((await quemGanhou(db, "00000000000000", termos)).total).toBe(0);
+
+      // The oldest publication date is what the empty state tells the visitor.
+      await db.query(`insert into contratos (id, orgao_cnpj, orgao, objeto, publicado_em, raw) values ('qg-antigo', $1, 'ORGAO TESTE', 'Contrato antigo', '2020-01-05T12:00:00Z', '{}')`, [A]);
+      expect((await contratoMaisAntigo(db))?.startsWith("2020-01-05")).toBe(true);
     } finally {
       await db.query(`delete from contratos where id like 'qg-%'`);
     }
