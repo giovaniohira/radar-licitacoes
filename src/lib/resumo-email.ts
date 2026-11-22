@@ -34,9 +34,15 @@ export interface BlocoResumo {
   atencao: string[];
 }
 
+/** Cuts at a whole sentence when one fits, else at a whole word, with "…" only in the second case. */
 const curto = (s: string, max: number) => {
   const t = s.replace(/\s+/g, " ").trim();
-  return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max);
+  const frase = Math.max(corte.lastIndexOf(". "), corte.lastIndexOf("; "));
+  if (frase > max * 0.5) return corte.slice(0, frase + 1);
+  const palavra = corte.lastIndexOf(" ");
+  return `${(palavra > max * 0.5 ? corte.slice(0, palavra) : corte.slice(0, max - 1)).replace(/[\s,;:.]+$/, "")}…`;
 };
 
 /** The first sentence, so the block stays one line of what is being bought. */
@@ -67,7 +73,7 @@ export function blocoDoResumo(r: Resumo): BlocoResumo {
   return {
     objeto: primeiraFrase(r.objeto, 220),
     prazo: principal ? `${curto(principal.evento, 60)}: ${curto(principal.data, 40)}` : null,
-    meEpp: r.exclusivo_me_epp ? "Exclusivo ME/EPP" : "Ampla concorrência",
+    meEpp: r.exclusivo_me_epp ? "reservada ou com cota para ME/EPP" : "ampla concorrência",
     atencao: (r.pontos_de_atencao ?? []).filter((x) => x.trim()).slice(0, 2).map((x) => curto(x, 170)),
   };
 }

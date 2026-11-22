@@ -123,7 +123,7 @@ export function renderDigest(
           .map((e) => {
             const b = blocoTexto(e);
             const resumo = b
-              ? `\n  Resumo por IA (confira no edital): ${b.objeto}\n${[b.prazo && `  Prazo: ${b.prazo}`, `  ${b.meEpp}`, ...b.atencao.map((a) => `  Atenção: ${a}`)]
+              ? `\n  Resumo por IA (confira no edital): ${b.objeto}\n${[b.prazo && `  Prazo no edital: ${b.prazo}`, `  Participação: ${b.meEpp}`, ...b.atencao.map((a) => `  Atenção: ${a}`)]
                   .filter(Boolean)
                   .join("\n")}\n  Ver resumo completo: ${link(e)}`
               : "";
@@ -142,7 +142,7 @@ export function renderDigest(
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr><td style="background:#f1f5f9;border-left:3px solid ${C.accent};padding:10px 12px;font-size:13px;line-height:19px;color:${C.text}">
 <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${C.muted}">Resumo por IA · confira no edital</div>
 <div style="margin-top:4px">${escapeHtml(b.objeto)}</div>
-${b.prazo ? `<div style="margin-top:4px"><b>Prazo:</b> ${escapeHtml(b.prazo)}</div>\n` : ""}<div style="margin-top:4px"><b>Participação:</b> ${escapeHtml(b.meEpp)}</div>
+${b.prazo ? `<div style="margin-top:4px"><b>Prazo no edital:</b> ${escapeHtml(b.prazo)}</div>\n` : ""}<div style="margin-top:4px"><b>Participação:</b> ${escapeHtml(b.meEpp)}</div>
 ${b.atencao.map((a) => `<div style="margin-top:4px;color:${C.warn}"><b>Atenção:</b> ${escapeHtml(a)}</div>\n`).join("")}<div style="margin-top:6px"><a href="${link(e)}" style="color:${C.accent};font-weight:600;text-decoration:underline">Ver resumo completo</a></div>
 </td></tr></table>`;
   };
