@@ -4,10 +4,12 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { HBars, ListaRanking, iniciais } from "@/components/charts";
+import { JsonLd } from "@/components/JsonLd";
 import { EditalRow, EditalRows, Empty, Interesse, Kpi, Loading, type EditalLinha } from "@/components/ui";
 import { pool, query } from "@/lib/db";
 import { formatBRL, formatBRLCompact, formatCNPJ, formatInt, local, nome, prazo } from "@/lib/format";
 import { analisar, orgaoInfo } from "@/lib/mercado";
+import { siteUrl, trilha } from "@/lib/schema";
 import { currentUser } from "@/lib/session";
 
 const getOrgao = cache((cnpj: string) => orgaoInfo(pool(), cnpj));
@@ -48,6 +50,7 @@ async function Orgao({ params }: PageProps<"/orgao/[cnpj]">) {
 
   return (
     <div className="page" style={{ gap: 20 }}>
+      <JsonLd data={trilha(siteUrl(), [{ nome: "Mercado", path: "/mercado" }, { nome: nome(info.nome), path: `/orgao/${cnpj}` }])} />
       <nav className="crumbs" aria-label="Você está em">
         <Link href="/mercado">Mercado</Link>
         <span>/</span>
