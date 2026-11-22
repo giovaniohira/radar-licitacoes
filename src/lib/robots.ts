@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 /** Signed-in or token-bearing routes. Their pages already set `robots: { index: false }`; this also stops the crawl. */
-export const PRIVADAS = ["/painel", "/pipeline", "/alertas", "/conta", "/boas-vindas", "/entrar/confirmar"];
+export const PRIVADAS = ["/painel", "/pipeline", "/alertas", "/conta", "/boas-vindas", "/entrar/confirmar", "/entrar/nova-senha"];
 
 /**
  * robots.txt paths are relative to the host root, so a sub-path deploy (APP_URL=https://host/radar)

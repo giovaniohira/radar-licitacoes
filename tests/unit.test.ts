@@ -1,7 +1,21 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { hashToken, icsToken, newLoginToken, normalizeEmail, signSession, verifyIcsToken, verifySession } from "@/lib/auth";
+import {
+  formatCnpj,
+  hashSenha,
+  hashToken,
+  icsToken,
+  newLoginToken,
+  normalizeCnpj,
+  normalizeEmail,
+  parseIdentificador,
+  problemaSenha,
+  signSession,
+  verificarSenha,
+  verifyIcsToken,
+  verifySession,
+} from "@/lib/auth";
 import { AVISO_DIGEST, renderDigest, type Alert } from "@/lib/alerts";
 import { quemSomos } from "@/lib/empresa";
 import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
@@ -41,6 +55,55 @@ describe("session", () => {
   it("normalizes e-mails", () => {
     expect(normalizeEmail("  Fulano@Empresa.COM.br ")).toBe("fulano@empresa.com.br");
     expect(normalizeEmail("sem-arroba")).toBeNull();
+  });
+});
+
+describe("passwords", () => {
+  it("hashes with a fresh salt and verifies", async () => {
+    const a = await hashSenha("cafe com leite 2026");
+    const b = await hashSenha("cafe com leite 2026");
+    expect(a).toMatch(/^scrypt\$32768\$8\$1\$[\w-]{22}\$[\w-]{43}$/);
+    expect(a).not.toBe(b);
+    expect(a).not.toContain("cafe");
+    expect(await verificarSenha("cafe com leite 2026", a)).toBe(true);
+    expect(await verificarSenha("cafe com leite 2025", a)).toBe(false);
+    expect(await verificarSenha("", a)).toBe(false);
+  });
+  it("always fails without a stored hash, or with a malformed one", async () => {
+    expect(await verificarSenha("qualquer", null)).toBe(false);
+    expect(await verificarSenha("qualquer", undefined)).toBe(false);
+    expect(await verificarSenha("qualquer", "lixo")).toBe(false);
+  });
+  it("treats composed and decomposed accents as the same password", async () => {
+    const h = await hashSenha("açaí gelado");
+    expect(await verificarSenha("açaí gelado".normalize("NFD"), h)).toBe(true);
+  });
+  it("only checks length", () => {
+    expect(problemaSenha("curta")).toMatch(/8 caracteres/);
+    expect(problemaSenha("12345678")).toBeNull();
+    expect(problemaSenha("x".repeat(201))).toMatch(/200/);
+  });
+});
+
+describe("CNPJ", () => {
+  it("validates check digits with or without punctuation", () => {
+    expect(normalizeCnpj("68.631.511/0001-45")).toBe("68631511000145");
+    expect(normalizeCnpj(" 68631511000145 ")).toBe("68631511000145");
+    expect(normalizeCnpj("68.631.511/0001-46")).toBeNull();
+    expect(normalizeCnpj("11.111.111/1111-11")).toBeNull();
+    expect(normalizeCnpj("6863151100014")).toBeNull();
+  });
+  it("accepts the alphanumeric format (Receita example 12.ABC.345/01DE-35)", () => {
+    expect(normalizeCnpj("12.abc.345/01de-35")).toBe("12ABC34501DE35");
+    expect(normalizeCnpj("12.ABC.345/01DE-36")).toBeNull();
+    expect(normalizeCnpj("12.ABC.345/01DE-3A")).toBeNull();
+    expect(formatCnpj("12ABC34501DE35")).toBe("12.ABC.345/01DE-35");
+  });
+  it("reads the single sign-in field as e-mail or CNPJ", () => {
+    expect(parseIdentificador(" Fulano@Empresa.com ")).toEqual({ tipo: "email", valor: "fulano@empresa.com" });
+    expect(parseIdentificador("68.631.511/0001-45")).toEqual({ tipo: "cnpj", valor: "68631511000145" });
+    expect(parseIdentificador("68.631.511/0001-40")).toBeNull();
+    expect(parseIdentificador("fulano@")).toBeNull();
   });
 });
 

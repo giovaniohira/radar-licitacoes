@@ -1,24 +1,18 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import {
-  LOGIN_TOKEN_MINUTES,
-  SESSION_COOKIE,
-  SESSION_DAYS,
-  hashToken,
-  newLoginToken,
-  normalizeEmail,
-  signSession,
-} from "@/lib/auth";
+import { SESSION_COOKIE, SESSION_DAYS, normalizeEmail, signSession } from "@/lib/auth";
+import * as contas from "@/lib/contas";
 import { query } from "@/lib/db";
-import { escapeHtml, sendMail } from "@/lib/mail";
 import { requireUser } from "@/lib/session";
 
 export type FormState = { ok?: string; error?: string } | null;
+/** Password sign-in: `pendente` is the address that still has to be confirmed. */
+export type EntrarState = { error?: string; pendente?: string; identificador?: string } | null;
 
-async function startSession(userId: number) {
-  (await cookies()).set(SESSION_COOKIE, signSession(userId), {
+async function startSession(userId: number, now = Date.now()) {
+  (await cookies()).set(SESSION_COOKIE, signSession(userId, now), {
     httpOnly: true,
     sameSite: "lax",
     secure: (process.env.APP_URL ?? "").startsWith("https://"),
@@ -27,84 +21,88 @@ async function startSession(userId: number) {
   });
 }
 
-// At most 3 links per account in the last 5 minutes, so the form can't be used to flood an inbox.
-async function linksRecentes(userId: number): Promise<number> {
-  const [r] = await query<{ n: string }>(
-    `select count(*) as n from login_tokens where user_id = $1 and expira_em > now() + interval '${LOGIN_TOKEN_MINUTES - 5} minutes'`,
-    [userId],
-  );
-  return Number(r.n);
+/** Client address as set by nginx (X-Real-IP); the app port is only reachable through it. */
+async function ip(): Promise<string | null> {
+  const h = await headers();
+  return h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0].trim() ?? null;
 }
 
-async function enviarLink(userId: number, para: string, emailNovo: string | null) {
-  const { token, hash } = newLoginToken();
-  await query(
-    `insert into login_tokens (token_hash, user_id, expira_em, email_novo) values ($1, $2, now() + make_interval(mins => $3), $4)`,
-    [hash, userId, LOGIN_TOKEN_MINUTES, emailNovo],
-  );
-  const url = `${process.env.APP_URL ?? "http://localhost:3000"}/entrar/confirmar?token=${token}`;
-  const titulo = emailNovo ? "Confirmar novo e-mail no Vencedital" : "Entrar no Vencedital";
-  const botao = emailNovo ? "Confirmar e-mail" : "Entrar";
-  await sendMail({
-    to: para,
-    subject: emailNovo ? "Confirme seu novo e-mail no Vencedital" : "Seu link de acesso ao Vencedital",
-    text: `${titulo}: ${url}
+const ERRO_ENVIOS = "Muitos pedidos deste endereço. Tente de novo em 15 minutos.";
+const campo = (form: FormData, nome: string) => String(form.get(nome) ?? "");
 
-O link vale ${LOGIN_TOKEN_MINUTES} minutos. Se não foi você, ignore este e-mail.`,
-    html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:auto;color:#18181b">
-<p style="font-size:16px;font-weight:600">${titulo}</p>
-<p><a href="${escapeHtml(url)}" style="display:inline-block;background:#1e293b;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">${botao}</a></p>
-<p style="color:#5f5f6b;font-size:13px">O link vale ${LOGIN_TOKEN_MINUTES} minutos e só funciona uma vez. Se não foi você, ignore este e-mail.</p></div>`,
-  });
+async function destino(userId: number): Promise<string> {
+  const [u] = await query<{ novo: boolean }>(`select onboarding_em is null as novo from users where id = $1`, [userId]);
+  return u?.novo ? "/boas-vindas" : "/painel";
+}
+
+export async function criarConta(_: FormState, form: FormData): Promise<FormState> {
+  if (await contas.excedeuEnviosIp(await ip())) return { error: ERRO_ENVIOS };
+  return contas.criarConta({ email: campo(form, "email"), senha: campo(form, "senha"), cnpj: campo(form, "cnpj") });
+}
+
+export async function reenviarVerificacao(_: FormState, form: FormData): Promise<FormState> {
+  if (await contas.excedeuEnviosIp(await ip())) return { error: ERRO_ENVIOS };
+  const r = await contas.reenviarVerificacao(campo(form, "email"));
+  return r.error ? r : { ok: "Enviamos de novo. Pode levar um minuto; confira também o spam." };
+}
+
+export async function entrar(_: EntrarState, form: FormData): Promise<EntrarState> {
+  const identificador = campo(form, "identificador");
+  const r = await contas.entrarComSenha(identificador, campo(form, "senha"), await ip());
+  if ("error" in r) return { error: r.error, identificador };
+  if ("pendente" in r) return { pendente: r.pendente };
+  await startSession(r.userId);
+  redirect(await destino(r.userId));
 }
 
 export async function pedirLink(_: FormState, form: FormData): Promise<FormState> {
-  const email = normalizeEmail(String(form.get("email") ?? ""));
-  if (!email) return { error: "E-mail inválido." };
-
-  const [user] = await query<{ id: number }>(
-    `insert into users (email) values ($1) on conflict (email) do update set email = excluded.email returning id`,
-    [email],
-  );
-  if ((await linksRecentes(user.id)) >= 3) return { error: "Já enviamos links há pouco. Confira sua caixa de entrada e o spam." };
-  await enviarLink(user.id, email, null);
-  return { ok: `Enviamos um link para ${email}. Ele vale ${LOGIN_TOKEN_MINUTES} minutos.` };
+  if (!normalizeEmail(campo(form, "email"))) return { error: "E-mail inválido." };
+  if (await contas.excedeuEnviosIp(await ip())) return { error: ERRO_ENVIOS };
+  return contas.pedirLinkAcesso(campo(form, "email"));
 }
 
 export async function confirmarLogin(form: FormData) {
-  const token = String(form.get("token") ?? "");
-  // Single use: the UPDATE only matches an unused, unexpired token.
-  const rows = token
-    ? await query<{ user_id: number; novo: boolean; email_novo: string | null }>(
-        `update login_tokens t set usado_em = now() from users u
-         where u.id = t.user_id and t.token_hash = $1 and t.usado_em is null and t.expira_em > now()
-         returning t.user_id, u.onboarding_em is null as novo, t.email_novo`,
-        [hashToken(token)],
-      )
-    : [];
-  if (!rows[0]) redirect("/entrar?erro=1");
-  const { user_id, novo, email_novo } = rows[0];
-  if (email_novo) {
-    // The address may have been taken by someone else since the link was sent.
-    const ok = await query(`update users set email = $1 where id = $2 and not exists (select 1 from users where email = $1) returning id`, [
-      email_novo,
-      user_id,
-    ]).catch(() => []);
-    await startSession(user_id);
-    redirect(ok.length ? "/conta?ok=email" : "/conta?erro=email");
-  }
-  await startSession(user_id);
-  redirect(novo ? "/boas-vindas" : "/painel");
+  const r = await contas.confirmarToken(campo(form, "token"));
+  if (!r) redirect("/entrar?erro=1");
+  await startSession(r.userId);
+  if (r.emailNovo) redirect(r.emailTrocado ? "/conta?ok=email" : "/conta?erro=email");
+  redirect(r.novo ? "/boas-vindas" : "/painel");
+}
+
+export async function esqueciSenha(_: FormState, form: FormData): Promise<FormState> {
+  if (await contas.excedeuEnviosIp(await ip())) return { error: ERRO_ENVIOS };
+  return contas.pedirNovaSenha(campo(form, "identificador"));
+}
+
+export async function novaSenha(_: FormState, form: FormData): Promise<FormState> {
+  const now = Date.now();
+  const r = await contas.redefinirSenha(campo(form, "token"), campo(form, "senha"), Math.floor(now / 1000));
+  if ("error" in r) return r;
+  await startSession(r.userId, now);
+  redirect(await destino(r.userId));
+}
+
+export async function trocarSenha(_: FormState, form: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const now = Date.now();
+  const r = await contas.trocarSenha(user.id, campo(form, "atual"), campo(form, "nova"), Math.floor(now / 1000));
+  // Other devices were signed out; this one gets a fresh session past the cutoff.
+  if (r.ok) await startSession(user.id, now);
+  return r;
+}
+
+export async function salvarCnpj(_: FormState, form: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return contas.definirCnpj(user.id, campo(form, "cnpj"));
 }
 
 export async function trocarEmail(_: FormState, form: FormData): Promise<FormState> {
   const user = await requireUser();
-  const email = normalizeEmail(String(form.get("email") ?? ""));
+  const email = normalizeEmail(campo(form, "email"));
   if (!email) return { error: "E-mail inválido." };
   if (email === user.email) return { error: "Esse já é o seu e-mail." };
   if ((await query(`select 1 from users where email = $1`, [email])).length) return { error: "Esse e-mail já tem uma conta no Vencedital." };
-  if ((await linksRecentes(user.id)) >= 3) return { error: "Já enviamos links há pouco. Tente de novo em alguns minutos." };
-  await enviarLink(user.id, email, email);
+  if (!(await contas.enviarToken(user.id, email, "email", { emailNovo: email }))) return { error: "Já enviamos links há pouco. Tente de novo em alguns minutos." };
   return { ok: `Enviamos um link para ${email}. A troca só vale depois que você abrir o link.` };
 }
 
@@ -118,8 +116,9 @@ export async function sairDeTodos() {
 export async function excluirConta(form: FormData) {
   const user = await requireUser();
   if (form.get("confirmar") !== "on") redirect("/conta");
-  // Cascades to alerts, pipeline, checklist, notes and login tokens.
-  await query(`delete from users where id = $1`, [user.id]);
+  // Cascades to alerts, pipeline, checklist, notes and login tokens. Failed sign-ins are keyed by e-mail/CNPJ, so they go too.
+  const [u] = await query<{ email: string; cnpj: string | null }>(`delete from users where id = $1 returning email, cnpj`, [user.id]);
+  if (u) await query(`delete from tentativas_login where chave = any($1::text[])`, [[`id:${u.email}`, `id:${u.cnpj}`]]);
   (await cookies()).delete(SESSION_COOKIE);
   redirect("/");
 }

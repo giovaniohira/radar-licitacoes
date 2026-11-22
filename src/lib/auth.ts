@@ -1,8 +1,13 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "node:crypto";
 
 export const SESSION_COOKIE = "radar_sessao";
 export const SESSION_DAYS = 30;
 export const LOGIN_TOKEN_MINUTES = 20;
+/** The sign-up confirmation link: long enough to open the inbox tomorrow morning. */
+export const VERIFY_TOKEN_MINUTES = 24 * 60;
+export const RESET_TOKEN_MINUTES = 30;
+export const SENHA_MIN = 8;
+export const SENHA_MAX = 200;
 
 function secret(): string {
   const s = process.env.SESSION_SECRET;
@@ -57,4 +62,76 @@ export function hashToken(token: string): string {
 export function normalizeEmail(email: string): string | null {
   const e = email.trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254 ? e : null;
+}
+
+// --- Passwords: scrypt from node:crypto, stored as "scrypt$N$r$p$salt$key" (base64url). ---
+
+const SCRYPT = { N: 2 ** 15, r: 8, p: 1, keylen: 32 };
+
+function scryptAsync(senha: string, salt: Buffer, keylen: number, opts: ScryptOptions): Promise<Buffer> {
+  // maxmem must exceed 128 * N * r (32 MiB at N=2^15, r=8), which is Node's default ceiling.
+  return new Promise((ok, fail) => scrypt(senha.normalize("NFKC"), salt, keylen, { ...opts, maxmem: 96 * 1024 * 1024 }, (e, k) => (e ? fail(e) : ok(k))));
+}
+
+/** Plain-language problem with a new password, or null if it is acceptable. No composition rules: length is what matters. */
+export function problemaSenha(senha: string): string | null {
+  if (senha.length < SENHA_MIN) return `A senha precisa ter pelo menos ${SENHA_MIN} caracteres.`;
+  if (senha.length > SENHA_MAX) return `A senha pode ter no máximo ${SENHA_MAX} caracteres.`;
+  return null;
+}
+
+export async function hashSenha(senha: string): Promise<string> {
+  const salt = randomBytes(16);
+  const { N, r, p, keylen } = SCRYPT;
+  const key = await scryptAsync(senha, salt, keylen, { N, r, p });
+  return `scrypt$${N}$${r}$${p}$${salt.toString("base64url")}$${key.toString("base64url")}`;
+}
+
+// Hashed once, lazily: checked when the account does not exist (or has no password) so the response takes as long as a real check.
+let dummy: Promise<string> | undefined;
+
+/** Constant-time check. A null hash (no account, or a link-only account) always fails after the same amount of work. */
+export async function verificarSenha(senha: string, armazenado: string | null | undefined): Promise<boolean> {
+  const alvo = armazenado ?? (await (dummy ??= hashSenha(randomBytes(16).toString("hex"))));
+  const [alg, n, r, p, salt, key] = alvo.split("$");
+  if (alg !== "scrypt" || !salt || !key) return false;
+  const esperado = Buffer.from(key, "base64url");
+  const got = await scryptAsync(senha.slice(0, SENHA_MAX), Buffer.from(salt, "base64url"), esperado.length, { N: Number(n), r: Number(r), p: Number(p) });
+  return timingSafeEqual(esperado, got) && armazenado != null;
+}
+
+// --- CNPJ, including the alphanumeric format the Receita Federal issues from July 2026 (IN RFB 2.229/2024). ---
+
+function dv(base: string): number {
+  // Character value is its ASCII code minus 48: digits keep their value, A=17 … Z=42.
+  let soma = 0;
+  for (let i = 0; i < base.length; i++) soma += (base.charCodeAt(i) - 48) * [2, 3, 4, 5, 6, 7, 8, 9][(base.length - 1 - i) % 8];
+  const resto = soma % 11;
+  return resto < 2 ? 0 : 11 - resto;
+}
+
+/** 14 characters, uppercase, no punctuation, check digits valid; or null. */
+export function normalizeCnpj(input: string): string | null {
+  const c = input.replace(/[\s./-]/g, "").toUpperCase();
+  if (!/^[0-9A-Z]{12}[0-9]{2}$/.test(c) || /^(.)\1+$/.test(c)) return null;
+  const d1 = dv(c.slice(0, 12));
+  const d2 = dv(c.slice(0, 12) + d1);
+  return c.endsWith(`${d1}${d2}`) ? c : null;
+}
+
+export function formatCnpj(c: string): string {
+  return `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`;
+}
+
+export type Identificador = { tipo: "email"; valor: string } | { tipo: "cnpj"; valor: string };
+
+/** The single "E-mail ou CNPJ" sign-in field: anything with an @ is an e-mail, the rest must be a valid CNPJ. */
+export function parseIdentificador(input: string): Identificador | null {
+  const s = input.trim();
+  if (s.includes("@")) {
+    const email = normalizeEmail(s);
+    return email ? { tipo: "email", valor: email } : null;
+  }
+  const cnpj = normalizeCnpj(s);
+  return cnpj ? { tipo: "cnpj", valor: cnpj } : null;
 }

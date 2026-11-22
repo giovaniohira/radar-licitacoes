@@ -11,7 +11,7 @@ import { query } from "@/lib/db";
 import { DIAS_TESTE, EMPRESA, PRECO_MENSAL } from "@/lib/empresa";
 import { formatBRLCompact, formatDia, formatInt, frase, nome, tituloCurto } from "@/lib/format";
 import { LIMITE_DIARIO } from "@/lib/summary";
-import { LoginForm } from "../entrar/LoginForm";
+import { HeroCadastro } from "../entrar/LoginForm";
 import produtoBusca from "./produto-busca.webp";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -50,8 +50,8 @@ const FAQ = [
     a: "Pode. Ele serve para você decidir se vale abrir o edital, e o link do documento original fica ao lado. Não é assessoria jurídica nem consultoria: a decisão e a proposta são suas.",
   },
   {
-    q: "Preciso de senha?",
-    a: "Não. Você digita o e-mail e recebe um link. Clique nele e pronto. O link vale 20 minutos e só funciona uma vez.",
+    q: "Como eu entro?",
+    a: "Com seu e-mail ou o CNPJ da empresa, e a senha que você cria no cadastro. Se preferir, peça um link de acesso no e-mail: ele vale 20 minutos e só funciona uma vez.",
   },
   {
     q: "Como cancelo?",
@@ -160,8 +160,8 @@ export default function Home() {
               e mostra prazos, documentos e riscos. Você decide rápido se vale disputar.
             </p>
             <div className="hero-cta">
-              <LoginForm variante="hero" />
-              <p className="hero-nota">{DIAS_TESTE} dias grátis, sem cartão. Não tem senha: digite seu e-mail e clique no link que mandamos.</p>
+              <HeroCadastro />
+              <p className="hero-nota">{DIAS_TESTE} dias grátis, sem cartão. Você cria a senha no próximo passo.</p>
               <Link href="/buscar" className="link-arr">
                 Ver licitações abertas agora, sem cadastro {seta}
               </Link>
@@ -339,7 +339,7 @@ export default function Home() {
                 <li>Prazos no Google Agenda ou Outlook</li>
               </ul>
               <p className="desc">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa.</p>
-              <Link className="btn btn-light btn-lg" href="/entrar">
+              <Link className="btn btn-light btn-lg" href="/criar-conta">
                 Começar teste grátis {seta}
               </Link>
             </article>
@@ -376,8 +376,8 @@ export default function Home() {
             Amanhã às 7h, os editais do seu ramo <em>no seu e-mail.</em>
           </h2>
           <div className="cta-row">
-            <p>Entre só com seu e-mail, diga o que você vende e pronto.</p>
-            <Link className="btn btn-light btn-lg" href="/entrar">
+            <p>Crie a conta, diga o que você vende e pronto.</p>
+            <Link className="btn btn-light btn-lg" href="/criar-conta">
               Começar teste grátis {seta}
             </Link>
           </div>
