@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { Icon } from "@/components/icons";
-import { trocarEmail } from "../../actions/auth";
+import { salvarCnpj, trocarEmail, trocarSenha } from "../../actions/auth";
+import { CampoSenha } from "../../entrar/LoginForm";
 
 export function TrocarEmail({ atual }: { atual: string }) {
   const [state, action, pending] = useActionState(trocarEmail, null);
@@ -18,6 +19,44 @@ export function TrocarEmail({ atual }: { atual: string }) {
           {pending ? "Enviando…" : "Trocar e-mail"}
         </button>
       </div>
+      {state?.error && <div className="notice">{state.error}</div>}
+    </form>
+  );
+}
+
+export function TrocarSenha({ temSenha, email }: { temSenha: boolean; email: string }) {
+  const [state, action, pending] = useActionState(trocarSenha, null);
+  if (state?.ok) return <div className="notice ok">{state.ok}</div>;
+  return (
+    <form action={action} className="stack" style={{ maxWidth: 420 }}>
+      {/* Lets password managers pair the new password with the right account. */}
+      <input type="text" name="usuario" autoComplete="username" value={email} hidden readOnly />
+      {temSenha && <CampoSenha name="atual" label="Senha atual" />}
+      <CampoSenha name="nova" label={temSenha ? "Nova senha" : "Senha"} nova />
+      <div>
+        <button type="submit" className="btn" disabled={pending}>
+          {pending ? "Salvando…" : temSenha ? "Trocar senha" : "Criar senha"}
+        </button>
+      </div>
+      {state?.error && <div className="notice">{state.error}</div>}
+    </form>
+  );
+}
+
+export function SalvarCnpj({ atual }: { atual: string }) {
+  const [state, action, pending] = useActionState(salvarCnpj, null);
+  return (
+    <form action={action} className="stack">
+      <div className="row" style={{ alignItems: "flex-end" }}>
+        <label className="field" style={{ flex: "1 1 280px", fontWeight: 550, color: "var(--muted)" }}>
+          CNPJ
+          <input className="input" name="cnpj" required autoComplete="off" spellCheck={false} defaultValue={atual} placeholder="00.000.000/0000-00" style={{ fontSize: 14 }} />
+        </label>
+        <button type="submit" className="btn" disabled={pending} style={{ height: 38 }}>
+          {pending ? "Salvando…" : "Salvar CNPJ"}
+        </button>
+      </div>
+      {state?.ok && <div className="notice ok">{state.ok}</div>}
       {state?.error && <div className="notice">{state.error}</div>}
     </form>
   );

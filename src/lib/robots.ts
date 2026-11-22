@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 /** Signed-in or token-bearing routes. Their pages already set `robots: { index: false }`; this also stops the crawl. */
-export const PRIVADAS = ["/painel", "/pipeline", "/alertas", "/conta", "/boas-vindas", "/entrar"];
+export const PRIVADAS = ["/painel", "/pipeline", "/alertas", "/conta", "/boas-vindas", "/entrar", "/criar-conta"];
 
 /** Filtered or paged variants of the public listings: every one is a near-duplicate of the bare URL. */
 export const FILTRADAS = ["/buscar?", "/mercado?"];

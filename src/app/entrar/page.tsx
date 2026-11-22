@@ -5,25 +5,27 @@ import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = { title: "Entrar" };
 
-async function Erro({ searchParams }: PageProps<"/entrar">) {
-  const { erro } = await searchParams;
-  return erro ? <div className="notice">O link expirou ou já foi usado. Peça um novo.</div> : null;
+// ?erro=1: a link that expired or was used. ?link: open straight on "Entrar com link".
+async function Conteudo({ searchParams }: PageProps<"/entrar">) {
+  const sp = await searchParams;
+  return (
+    <>
+      {sp.erro && (
+        <div className="notice" role="alert">
+          O link expirou ou já foi usado. Entre com sua senha ou peça um link novo.
+        </div>
+      )}
+      <LoginForm link={sp.link !== undefined} />
+    </>
+  );
 }
 
 export default function Entrar(props: PageProps<"/entrar">) {
   return (
     <AuthLayout>
-      <div>
-        <h1>Entrar no Vencedital</h1>
-        <p>Não tem senha. Digite seu e-mail e mandamos um link para entrar.</p>
-      </div>
-      <Suspense>
-        <Erro {...props} />
+      <Suspense fallback={<LoginForm />}>
+        <Conteudo {...props} />
       </Suspense>
-      <LoginForm />
-      <p className="small subtle" style={{ lineHeight: 1.5 }}>
-        Primeira vez? É o mesmo caminho: digite seu e-mail e a conta é criada na hora.
-      </p>
     </AuthLayout>
   );
 }
