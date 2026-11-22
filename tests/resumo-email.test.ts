@@ -56,6 +56,20 @@ describe("blocoDoResumo", () => {
     });
   });
 
+  it("does not take the start of the bidding or a question deadline as the main date", () => {
+    const prazos = [
+      { evento: "Início do envio de propostas", data: "19/11/2026 08:00" },
+      { evento: "Limite para pedidos de esclarecimento e impugnação", data: "24/11/2026 18:00" },
+      { evento: "Abertura da sessão pública", data: "27/11/2026 08:00" },
+      { evento: "Início da fase de lances", data: "27/11/2026 09:00" },
+      { evento: "Prazo de validade das propostas", data: "mínimo de 90 dias" },
+    ];
+    expect(blocoDoResumo(resumo({ prazos })).prazo).toBe("Abertura da sessão pública: 27/11/2026 08:00");
+    expect(blocoDoResumo(resumo({ prazos: [{ evento: "Início do envio de propostas", data: "19/11/2026" }, ...prazos.slice(2)] })).prazo).toContain("Abertura da sessão");
+    // Only a start date: still shown (better than nothing), not dropped.
+    expect(blocoDoResumo(resumo({ prazos: [{ evento: "Início do envio de propostas", data: "19/11/2026" }] })).prazo).toBe("Início do envio de propostas: 19/11/2026");
+  });
+
   it("copes with a thin summary", () => {
     const b = blocoDoResumo(resumo({ prazos: [], exclusivo_me_epp: false, pontos_de_atencao: [" ", ""] }));
     expect(b).toMatchObject({ prazo: null, meEpp: "Ampla concorrência", atencao: [] });

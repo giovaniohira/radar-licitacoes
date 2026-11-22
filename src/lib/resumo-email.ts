@@ -46,10 +46,24 @@ const primeiraFrase = (s: string, max: number) => {
   return curto(fim > 20 ? t.slice(0, fim + 1) : t, max);
 };
 
+/**
+ * How much an event looks like "the date that decides whether you can bid": the bid limit, then the opening or session.
+ * Starts ("início do envio"), questions, challenges and proposal validity are dates too, but not that one.
+ */
+const pesoDoPrazo = (evento: string) => {
+  const e = evento.toLowerCase();
+  let p = 0;
+  if (/proposta/.test(e) && /limite|encerra|at[eé]|prazo final|recebimento/.test(e)) p += 3;
+  if (/sess[aã]o|abertura|disputa|lances/.test(e)) p += 2;
+  if (/in[ií]cio|credenciamento|cadastr/.test(e)) p -= 3;
+  if (/esclarecimento|impugna|validade|vig[eê]ncia/.test(e)) p -= 2;
+  return p;
+};
+
 /** What the e-mail shows from a full summary: object, main deadline, ME/EPP, at most two attention points. */
 export function blocoDoResumo(r: Resumo): BlocoResumo {
   const prazos = r.prazos ?? [];
-  const principal = prazos.find((p) => /proposta/i.test(p.evento)) ?? prazos.find((p) => /sess[aã]o|abertura|disputa/i.test(p.evento)) ?? prazos[0];
+  const principal = prazos.reduce<(typeof prazos)[number] | undefined>((melhor, p) => (!melhor || pesoDoPrazo(p.evento) > pesoDoPrazo(melhor.evento) ? p : melhor), undefined);
   return {
     objeto: primeiraFrase(r.objeto, 220),
     prazo: principal ? `${curto(principal.evento, 60)}: ${curto(principal.data, 40)}` : null,
