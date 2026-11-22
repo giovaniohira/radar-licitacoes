@@ -1,9 +1,9 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { connection } from "next/server";
-import { Icon } from "@/components/icons";
+import { Icon, Mark } from "@/components/icons";
 import { editalHref, type EditalLinha } from "@/components/ui";
 import { MAX_ALERTAS } from "@/lib/alerts";
 import { query } from "@/lib/db";
@@ -129,200 +129,273 @@ async function Previa() {
   ));
 }
 
+const seta = <Icon name="arrowRight" size={15} className="arr" />;
+
+/** Section label: "01 — Como funciona". */
+function Kicker({ n, children }: { n: string; children: ReactNode }) {
+  return (
+    <p className="kicker">
+      <span className="idx">{n}</span>
+      {children}
+    </p>
+  );
+}
+
 export default function Home() {
   return (
     <main id="conteudo">
-      <section className="container hero">
-        <div className="hero-copy">
-          <h1>Os editais do seu ramo chegam às 7h. Já lidos.</h1>
-          <p className="lead">
-            Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
-            prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
-          </p>
-          <LoginForm variante="hero" />
-          <p className="small subtle">{DIAS_TESTE} dias grátis. Sem senha e sem cartão: você entra pelo link que chega no e-mail.</p>
-          <Link href="/buscar" className="small" style={{ fontWeight: 600 }}>
-            Ver licitações abertas agora, sem cadastro →
-          </Link>
-        </div>
+      {/* Ink block: promise, sign-up, product preview and today's live PNCP numbers. */}
+      <section className="hero on-ink">
+        <div className="container">
+          <p className="kicker rise">Alerta diário de licitações do PNCP</p>
+          <h1 className="display hero-h rise d1">
+            Os editais do seu ramo chegam às 7h. <em>Já lidos.</em>
+          </h1>
 
-        <div className="hero-mock" aria-hidden>
-          <div className="xs subtle">Hoje</div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 650, letterSpacing: "-0.02em" }}>Bom dia. Você tem 3 coisas pra hoje.</div>
-          <div className="card" style={{ overflow: "hidden" }}>
-            {MOCK.map((t) => (
-              <div key={t.n} className={`task${t.urg ? " urg" : ""}`}>
-                <span className="n">{t.n}</span>
-                <div className="body" style={{ flexBasis: 0, flexGrow: 1 }}>
-                  <div className="t">{t.t}</div>
-                  <p>{t.s}</p>
+          <div className="hero-grid">
+            <div className="hero-copy rise d2">
+              <p className="lead">
+                Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
+                prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
+              </p>
+              <LoginForm variante="hero" />
+              <p className="hero-nota">{DIAS_TESTE} dias grátis. Sem senha e sem cartão: você entra pelo link que chega no e-mail.</p>
+              <Link href="/buscar" className="link-arr">
+                Ver licitações abertas agora, sem cadastro {seta}
+              </Link>
+            </div>
+
+            <div className="hero-mock rise d3" aria-hidden>
+              <div className="mock-bar">
+                <span>Hoje</span>
+                <span>07:00</span>
+              </div>
+              <div className="mock-body">
+                <div className="mock-h">Bom dia. Você tem 3 coisas pra hoje.</div>
+                <div className="card">
+                  {MOCK.map((t) => (
+                    <div key={t.n} className={`task${t.urg ? " urg" : ""}`}>
+                      <span className="n">{t.n}</span>
+                      <div className="body">
+                        <div className="t">{t.t}</div>
+                        <p>{t.s}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="card mock-ia">
+                  <div className="k">
+                    <Icon name="sparkle" size={13} /> Resumo por IA
+                  </div>
+                  <b>Tem alguma pegadinha?</b>
+                  <p>Amostra do produto em até 3 dias úteis após a convocação.</p>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-          <div className="card card-pad stack" style={{ gap: 6 }}>
-            <div className="row" style={{ gap: 6, fontSize: 12, fontWeight: 600, color: "var(--brand-text)" }}>
-              <Icon name="sparkle" size={14} /> Resumo por IA
+
+          <div id="hoje" className="cobertura" role="region" aria-labelledby="hoje-h">
+            <div className="cob-head">
+              <h2 id="hoje-h" className="kicker vivo">
+                Cobertura do PNCP hoje
+              </h2>
+              <span>Lido três vezes por dia, de órgãos municipais, estaduais e federais.</span>
             </div>
-            <div className="small" style={{ fontWeight: 600 }}>
-              Tem alguma pegadinha?
+            <div className="numeros">
+              <Suspense fallback={<div className="numeros-sk" />}>
+                <Numeros />
+              </Suspense>
             </div>
-            <div className="small muted">Amostra do produto em até 3 dias úteis após a convocação.</div>
           </div>
         </div>
       </section>
 
-      <section id="hoje" className="band" aria-label="Cobertura do PNCP hoje">
+      <section id="como" className="sec" aria-labelledby="como-h">
         <div className="container">
-          <div className="spread">
-            <h2>Cobertura do PNCP hoje</h2>
-            <span className="small subtle">Lido três vezes por dia, de órgãos municipais, estaduais e federais.</span>
+          <div className="sec-head">
+            <Kicker n="01">Como funciona</Kicker>
+            <h2 id="como-h" className="display sec-h">
+              Do cadastro ao primeiro e-mail em três passos
+            </h2>
           </div>
-          <div className="numeros">
-            <Suspense fallback={<div style={{ height: 88 }} />}>
-              <Numeros />
-            </Suspense>
-          </div>
-        </div>
-      </section>
-
-      <section className="container landing-sec">
-        <h2 className="big-h">Do edital publicado à proposta enviada, sem planilha.</h2>
-        <div className="recursos">
-          {RECURSOS.map((r) => (
-            <article key={r.t}>
-              <h3>{r.t}</h3>
-              <p>{r.d}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="container landing-sec" aria-labelledby="ia-h">
-        <div className="stack" style={{ gap: 10 }}>
-          <h2 id="ia-h" className="big-h">
-            A IA lê o edital. Você lê o resumo.
-          </h2>
-          <p className="muted" style={{ fontSize: 17 }}>
-            Ela abre o PDF e devolve só o que decide se você entra:
-          </p>
-        </div>
-        <dl className="ia-lista">
-          {IA.map((i) => (
-            <div key={i.t}>
-              <dt>{i.t}</dt>
-              <dd>{i.d}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="small muted">O resumo ajuda a decidir rápido. Ele não substitui o edital, e o link do original está sempre ao lado.</p>
-      </section>
-
-      <section id="como" className="band como">
-        <div className="container">
-          <div className="como-passos">
-            <h2>Do cadastro ao primeiro e-mail em três passos</h2>
-            {PASSOS.map((p, i) => (
-              <div key={p.t} className="p">
-                <span className="n">{i + 1}</span>
+          <div className="como-grid">
+            <ol className="passos">
+              {PASSOS.map((p, i) => (
+                <li key={p.t} className="reveal">
+                  <span className="n">0{i + 1}</span>
+                  <div>
+                    <h3>{p.t}</h3>
+                    <p>{p.d}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <div id="email" className="email-previa reveal">
+              <div className="h">
+                <span className="av" aria-hidden>
+                  <Mark size={14} />
+                </span>
                 <div>
-                  <h3>{p.t}</h3>
-                  <p>{p.d}</p>
+                  <strong>Vencedital · hoje, 07:00</strong>
+                  <div>Editais novos para o seu ramo</div>
                 </div>
               </div>
-            ))}
-          </div>
-          <div id="email" className="email-previa">
-            <div className="h">
-              <div>
-                <strong>Vencedital · hoje, 07:00</strong>
-              </div>
-              <div>Editais novos para o seu ramo</div>
+              <Suspense fallback={<div style={{ height: 210 }} />}>
+                <Previa />
+              </Suspense>
+              <div className="f">Prévia do e-mail diário, com editais reais abertos agora</div>
             </div>
-            <Suspense fallback={<div style={{ height: 210 }} />}>
-              <Previa />
-            </Suspense>
-            <div className="f">Prévia do e-mail diário, com editais reais abertos agora</div>
           </div>
         </div>
       </section>
 
-      <section className="container landing-sec" aria-labelledby="mercado-h">
-        <h2 id="mercado-h" className="big-h">
-          Antes de dar o preço, veja quem já ganhou
-        </h2>
-        <p className="muted" style={{ fontSize: 17, maxWidth: 640 }}>
-          Cada órgão e cada fornecedor do PNCP tem uma página: o que comprou, de quem, em que faixa de valor e com que frequência.
-        </p>
-        <Link className="btn" href="/mercado" style={{ width: "fit-content" }}>
-          Explorar o mercado →
-        </Link>
+      <section className="sec on-ink" aria-labelledby="ia-h">
+        <div className="container">
+          <div className="sec-head split">
+            <div>
+              <Kicker n="02">Resumo por IA</Kicker>
+              <h2 id="ia-h" className="display sec-h">
+                A IA lê o edital. <em>Você lê o resumo.</em>
+              </h2>
+            </div>
+            <p className="sec-sub">Ela abre o PDF e devolve só o que decide se você entra:</p>
+          </div>
+          <dl className="ia-grid">
+            {IA.map((i) => (
+              <div key={i.t} className="reveal">
+                <dt>{i.t}</dt>
+                <dd>{i.d}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="sec-foot">O resumo ajuda a decidir rápido. Ele não substitui o edital, e o link do original está sempre ao lado.</p>
+        </div>
       </section>
 
-      <section id="precos" className="band" aria-labelledby="precos-h">
+      <section className="sec sec-white" aria-labelledby="rec-h">
         <div className="container">
-          <h2 id="precos-h" className="big-h">
-            Preço na tela, sem falar com vendedor
-          </h2>
+          <div className="sec-head">
+            <Kicker n="03">Recursos</Kicker>
+            <h2 id="rec-h" className="display sec-h">
+              Do edital publicado à proposta enviada, sem planilha.
+            </h2>
+          </div>
+          <div className="recursos">
+            {RECURSOS.map((r, i) => (
+              <article key={r.t} className="reveal">
+                <span className="n">0{i + 1}</span>
+                <h3>{r.t}</h3>
+                <p>{r.d}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="sec sec-sand" aria-labelledby="mercado-h">
+        <div className="container mercado">
+          <div>
+            <Kicker n="04">Mercado</Kicker>
+            <h2 id="mercado-h" className="display sec-h">
+              Antes de dar o preço, veja quem já ganhou
+            </h2>
+          </div>
+          <div className="mercado-body">
+            <p>Cada órgão e cada fornecedor do PNCP tem uma página: o que comprou, de quem, em que faixa de valor e com que frequência.</p>
+            <Link className="link-arr" href="/mercado">
+              Explorar o mercado {seta}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="precos" className="sec" aria-labelledby="precos-h">
+        <div className="container">
+          <div className="sec-head">
+            <Kicker n="05">Preços</Kicker>
+            <h2 id="precos-h" className="display sec-h">
+              Preço na tela, sem falar com vendedor
+            </h2>
+          </div>
           <div className="precos">
-            <article className="card card-pad stack">
+            <article className="plano">
               <h3>Grátis, sem cadastro</h3>
-              <p className="muted">Busca de licitações, página de cada edital e Mercado.</p>
-              <Link className="btn" href="/buscar" style={{ width: "fit-content" }}>
-                Ver licitações abertas
+              <p className="preco">
+                <b className="num">R$ 0</b>
+              </p>
+              <p className="desc">Busca de licitações, página de cada edital e Mercado.</p>
+              <Link className="btn btn-lg" href="/buscar">
+                Ver licitações abertas {seta}
               </Link>
             </article>
-            <article className="card card-pad stack destaque">
-              <h3>Vencedital</h3>
+            <article className="plano destaque on-ink">
+              <div className="plano-top">
+                <h3>Vencedital</h3>
+                <span className="selo">Preço de fundador</span>
+              </div>
               <p className="preco">
                 <b className="num">R$ {PRECO_MENSAL}</b>
                 <span>/mês</span>
               </p>
-              <p className="muted">
-                Até {MAX_ALERTAS} alertas diários, {LIMITE_DIARIO} resumos por IA por dia, Minhas disputas com checklist e prazos na sua agenda.
-              </p>
-              <p className="small">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa. Nota fiscal todo mês.</p>
-              <Link className="btn btn-primary" href="/entrar" style={{ width: "fit-content" }}>
-                Começar teste grátis
+              <ul className="inclui">
+                <li>Até {MAX_ALERTAS} alertas diários</li>
+                <li>{LIMITE_DIARIO} resumos por IA por dia</li>
+                <li>Minhas disputas com checklist</li>
+                <li>Prazos na sua agenda</li>
+              </ul>
+              <p className="desc">{DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem multa. Nota fiscal todo mês.</p>
+              <Link className="btn btn-light btn-lg" href="/entrar">
+                Começar teste grátis {seta}
               </Link>
             </article>
           </div>
-          <p className="small">
+          <p className="fundador">
             <b>Preço de fundador:</b> as 10 primeiras empresas pagam R$ {PRECO_MENSAL}/mês sem reajuste, enquanto a assinatura estiver ativa. Se desistir
             em até 7 dias do primeiro pagamento, devolvemos tudo. Ao assinar, você aceita os <Link href="/termos">Termos de Uso</Link>.
           </p>
         </div>
       </section>
 
-      <section className="container landing-sec" aria-labelledby="faq-h">
-        <h2 id="faq-h" className="big-h">
-          Perguntas frequentes
-        </h2>
-        <div className="faq">
-          {FAQ.map((f) => (
-            <details key={f.q}>
-              <summary>{f.q}</summary>
-              <p>{f.a}</p>
-            </details>
-          ))}
+      <section className="sec sec-white" aria-labelledby="faq-h">
+        <div className="container faq-grid">
+          <div className="faq-side">
+            <Kicker n="06">Dúvidas</Kicker>
+            <h2 id="faq-h" className="display sec-h">
+              Perguntas frequentes
+            </h2>
+          </div>
+          <div className="faq">
+            {FAQ.map((f) => (
+              <details key={f.q}>
+                <summary>{f.q}</summary>
+                <p>{f.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="container cta-final">
-        <p className="small muted" style={{ maxWidth: 640 }}>
-          Feito por Giovani Ohira, da {EMPRESA.razaoSocial}, porque achar licitação hoje é uma planilha e muita paciência.
-          {EMPRESA.contato && (
-            <>
-              {" "}
-              Se o resumo errar ou faltar algo, escreva para <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>: quem responde sou eu.
-            </>
-          )}
-        </p>
-        <h2>Amanhã às 7h, os editais do seu ramo no seu e-mail.</h2>
-        <p>Entre só com seu e-mail, diga o que você vende e pronto.</p>
-        <Link className="btn btn-primary" href="/entrar">
-          Começar teste grátis
-        </Link>
+      <section className="cta-final on-ink">
+        <div className="container">
+          <h2 className="display">
+            Amanhã às 7h, os editais do seu ramo <em>no seu e-mail.</em>
+          </h2>
+          <div className="cta-row">
+            <p>Entre só com seu e-mail, diga o que você vende e pronto.</p>
+            <Link className="btn btn-light btn-lg" href="/entrar">
+              Começar teste grátis {seta}
+            </Link>
+          </div>
+          <p className="assinatura">
+            Feito por Giovani Ohira, da {EMPRESA.razaoSocial}, porque achar licitação hoje é uma planilha e muita paciência.
+            {EMPRESA.contato && (
+              <>
+                {" "}
+                Se o resumo errar ou faltar algo, escreva para <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>: quem responde sou eu.
+              </>
+            )}
+          </p>
+        </div>
       </section>
     </main>
   );

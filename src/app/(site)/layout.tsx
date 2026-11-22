@@ -1,49 +1,79 @@
 import Link from "next/link";
-import { Logo } from "@/components/icons";
+import { Icon, Logo } from "@/components/icons";
 import { EMPRESA, quemSomos } from "@/lib/empresa";
+
+const NAV = [
+  { href: "/#como", label: "Como funciona" },
+  { href: "/buscar", label: "Licitações abertas" },
+  { href: "/mercado", label: "Mercado" },
+  { href: "/#precos", label: "Preços" },
+];
 
 export default function SiteLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="landing">
-      <header className="site-head">
+      <header className="site-head on-ink">
         <div className="container">
           <Logo />
           <nav aria-label="Site">
-            <Link href="/#como">Como funciona</Link>
-            <Link href="/buscar">Licitações abertas</Link>
-            <Link href="/mercado">Mercado</Link>
-            <Link href="/#precos">Preços</Link>
+            {NAV.map((n) => (
+              <Link key={n.href} href={n.href}>
+                {n.label}
+              </Link>
+            ))}
           </nav>
           <div className="acts">
-            <Link className="btn btn-ghost" href="/entrar" style={{ color: "var(--text)" }}>
+            <Link className="btn btn-ghost" href="/entrar">
               Entrar
             </Link>
-            <Link className="btn btn-primary" href="/entrar">
-              Começar teste grátis
+            <Link className="btn btn-light" href="/entrar">
+              Começar teste grátis <Icon name="arrowRight" size={14} className="arr" />
             </Link>
           </div>
         </div>
       </header>
       {children}
-      <footer className="site-foot">
+      <footer className="site-foot on-ink">
         <div className="container">
-          <span>
-            {EMPRESA.produto} é um serviço da {quemSomos()} ·{" "}
-            {EMPRESA.contato && (
-              <>
-                <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a> ·{" "}
-              </>
-            )}
-            dados públicos do{" "}
-            <a href="https://pncp.gov.br" target="_blank" rel="noreferrer">
-              PNCP
-            </a>
-            , sem vínculo com o governo
-          </span>
-          <span className="row" style={{ gap: 16 }}>
-            <Link href="/termos">Termos</Link>
-            <Link href="/privacidade">Privacidade</Link>
-          </span>
+          <div className="foot-grid">
+            <div className="foot-brand">
+              <Logo />
+              <p>
+                {EMPRESA.produto} é um serviço da {quemSomos()}.
+                {EMPRESA.contato && (
+                  <>
+                    {" "}
+                    <a href={`mailto:${EMPRESA.contato}`}>{EMPRESA.contato}</a>
+                  </>
+                )}
+              </p>
+            </div>
+            <nav aria-label="Produto" className="foot-col">
+              <p className="kicker">Produto</p>
+              {NAV.map((n) => (
+                <Link key={n.href} href={n.href}>
+                  {n.label}
+                </Link>
+              ))}
+            </nav>
+            <nav aria-label="Legal" className="foot-col">
+              <p className="kicker">Legal</p>
+              <Link href="/termos">Termos</Link>
+              <Link href="/privacidade">Privacidade</Link>
+            </nav>
+          </div>
+          <div className="foot-base">
+            <span>
+              Dados públicos do{" "}
+              <a href="https://pncp.gov.br" target="_blank" rel="noreferrer">
+                PNCP
+              </a>
+              , sem vínculo com o governo
+            </span>
+          </div>
+          <div className="foot-word" aria-hidden>
+            vencedital
+          </div>
         </div>
       </footer>
     </div>
