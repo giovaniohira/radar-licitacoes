@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { connection } from "next/server";
@@ -11,6 +12,7 @@ import { DIAS_TESTE, EMPRESA, PRECO_MENSAL } from "@/lib/empresa";
 import { formatBRLCompact, formatDia, formatInt, frase, nome, tituloCurto } from "@/lib/format";
 import { LIMITE_DIARIO } from "@/lib/summary";
 import { LoginForm } from "../entrar/LoginForm";
+import produtoBusca from "./produto-busca.webp";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
@@ -63,12 +65,18 @@ const FAQ = [
   },
 ];
 
-// Illustration of the Hoje screen in the hero; the real one is built from the user's data.
-const MOCK = [
-  { n: 1, t: "Juntar 3 documentos dos gêneros alimentícios", s: "prazo quarta, 10h", urg: true },
-  { n: 2, t: "Revisar os editais novos do seu ramo", s: "chegaram desde ontem" },
-  { n: 3, t: "Decidir sobre o hortifruti", s: "o resumo da IA já está pronto" },
+// Callouts over the real search screenshot in the hero. Boxes are % of the image, measured on the
+// 1280×841 capture (docs/visual-revamp/README.md says how to retake it): alvo = x, y, w, h of the
+// highlighted control; bolha = where the bubble sits, anchored by its right edge on the right side so it
+// never runs off narrower screens.
+const DESTAQUES: { t: string; d: string; alvo: [number, number, number, number]; bolha: { left?: number; right?: number; top: number } }[] = [
+  { t: "Diga o que você vende", d: "A busca já vem com as palavras que os órgãos usam.", alvo: [66, 25, 7, 3.4], bolha: { left: 69, top: 6 } },
+  { t: "Receba só o que é novo", d: "Salve a busca e os editais novos chegam às 7h.", alvo: [84.6, 53.3, 11.1, 4.3], bolha: { right: 4, top: 39 } },
+  { t: "Marque o que interessa", d: "O edital vai para Minhas disputas, com checklist.", alvo: [78, 70.6, 8.9, 3.8], bolha: { right: -2, top: 80 } },
+  { t: "Não perca nenhum prazo", d: "O prazo da proposta em cada edital.", alvo: [68.2, 87, 5.2, 2.4], bolha: { left: 44, top: 92 } },
 ];
+
+const pct = (n: number) => `${n}%`;
 
 // The landing's numbers are cached for an hour: they barely move between ingests, and computing them
 // on every visit made the first request after idle slow.
@@ -152,47 +160,60 @@ export default function Home() {
             Os editais do seu ramo chegam às 7h. <em>Já lidos.</em>
           </h1>
 
-          <div className="hero-grid">
-            <div className="hero-copy rise d2">
-              <p className="lead">
-                Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
-                prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
-              </p>
+          <div className="hero-intro rise d2">
+            <p className="lead">
+              Para quem vende ao governo: todo dia, as licitações novas do seu ramo e dos seus estados no e-mail, com o PDF resumido pela IA (objeto,
+              prazos, habilitação, cota ME/EPP e pontos de atenção). Você decide em minutos se vale disputar.
+            </p>
+            <div className="hero-cta">
               <LoginForm variante="hero" />
               <p className="hero-nota">{DIAS_TESTE} dias grátis. Sem senha e sem cartão: você entra pelo link que chega no e-mail.</p>
               <Link href="/buscar" className="link-arr">
                 Ver licitações abertas agora, sem cadastro {seta}
               </Link>
             </div>
-
-            <div className="hero-mock rise d3" aria-hidden>
-              <div className="mock-bar">
-                <span>Hoje</span>
-                <span>07:00</span>
-              </div>
-              <div className="mock-body">
-                <div className="mock-h">Bom dia. Você tem 3 coisas pra hoje.</div>
-                <div className="card">
-                  {MOCK.map((t) => (
-                    <div key={t.n} className={`task${t.urg ? " urg" : ""}`}>
-                      <span className="n">{t.n}</span>
-                      <div className="body">
-                        <div className="t">{t.t}</div>
-                        <p>{t.s}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="card mock-ia">
-                  <div className="k">
-                    <Icon name="sparkle" size={13} /> Resumo por IA
-                  </div>
-                  <b>Tem alguma pegadinha?</b>
-                  <p>Amostra do produto em até 3 dias úteis após a convocação.</p>
-                </div>
-              </div>
-            </div>
           </div>
+
+          {/* A real screen, not an illustration, with what matters called out on top of it. */}
+          <figure className="hero-shot rise d3">
+            <div className="shot">
+              <div className="shot-img">
+                <Image
+                  src={produtoBusca}
+                  alt="Tela Encontrar editais do Vencedital: busca de alimentação escolar com editais abertos no PNCP, valor, prazo e o botão Tenho interesse"
+                  sizes="(max-width: 1240px) 100vw, 1160px"
+                  loading="eager"
+                  fetchPriority="high"
+                  unoptimized
+                />
+                {DESTAQUES.map((d, i) => (
+                  <span
+                    key={d.t}
+                    className="alvo"
+                    data-n={`0${i + 1}`}
+                    aria-hidden
+                    style={{ left: pct(d.alvo[0]), top: pct(d.alvo[1]), width: pct(d.alvo[2]), height: pct(d.alvo[3]), animationDelay: `${0.7 + i * 0.15}s` }}
+                  />
+                ))}
+              </div>
+              <ol className="bolhas">
+                {DESTAQUES.map((d, i) => (
+                  <li key={d.t} className="bolha" style={{
+                      top: pct(d.bolha.top),
+                      ...(d.bolha.right != null ? { right: pct(d.bolha.right) } : { left: pct(d.bolha.left ?? 0) }),
+                      animationDelay: `${0.8 + i * 0.15}s`,
+                    }}>
+                    <i aria-hidden>0{i + 1}</i>
+                    <span>
+                      <b>{d.t}</b>
+                      {d.d}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <figcaption>Tela real do Vencedital, com editais publicados no PNCP.</figcaption>
+          </figure>
 
           <div id="hoje" className="cobertura" role="region" aria-labelledby="hoje-h">
             <div className="cob-head">
