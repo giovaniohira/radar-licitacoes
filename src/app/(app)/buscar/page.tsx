@@ -10,19 +10,18 @@ import { query } from "@/lib/db";
 import { formatBRLCompact, formatInt } from "@/lib/format";
 import { parseFiltros, withParams } from "@/lib/params";
 import { MODALIDADES } from "@/lib/pncp";
-import { metadataListagem } from "@/lib/seo";
 import { ORDENS, buildSearch, type EditalResumo } from "@/lib/search";
 import { currentUser } from "@/lib/session";
 import { SETORES, UFS } from "@/lib/setores";
 import { salvarBusca } from "../../actions/alertas";
 
-export async function generateMetadata({ searchParams }: PageProps<"/buscar">): Promise<Metadata> {
-  return metadataListagem(await searchParams, {
-    path: "/buscar",
-    title: "Licitações abertas no PNCP, com busca por estado e prazo",
-    description: "Editais abertos no PNCP, de órgãos federais, estaduais e municipais. Filtre por palavra, estado, modalidade, valor e prazo da proposta.",
-  });
-}
+// Static on purpose: metadata that reads searchParams is dynamic and streams into the <body>, out of the <head> of any
+// crawler Next does not know. Filtered URLs share this canonical, and robots.txt keeps crawlers off "/buscar?".
+export const metadata: Metadata = {
+  title: "Licitações abertas no PNCP, com busca por estado e prazo",
+  description: "Editais abertos no PNCP, de órgãos federais, estaduais e municipais. Filtre por palavra, estado, modalidade, valor e prazo da proposta.",
+  alternates: { canonical: "/buscar" },
+};
 
 const POR_PAGINA = 25;
 const MODALIDADES_BUSCA = Object.entries(MODALIDADES).filter(([id]) => id !== "9");
