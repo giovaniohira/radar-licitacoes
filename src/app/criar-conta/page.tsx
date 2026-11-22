@@ -5,7 +5,7 @@ import { AuthLayout } from "@/components/AuthLayout";
 import { DIAS_TESTE } from "@/lib/empresa";
 import { CadastroForm } from "./CadastroForm";
 
-export const metadata: Metadata = { title: "Criar conta" };
+export const metadata: Metadata = { title: "Criar conta", robots: { index: false } };
 
 // The landing page's hero form sends the e-mail here as ?email=.
 async function Formulario({ searchParams }: PageProps<"/criar-conta">) {

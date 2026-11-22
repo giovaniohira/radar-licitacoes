@@ -25,7 +25,8 @@ import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
 import { fold, renderIcs, vencendo, type PipelineItem } from "@/lib/pipeline";
 import { minimoDePalavras, prefiltroGin, termosDoObjeto } from "@/lib/quemganhou";
-import { PRIVADAS, robotsFor } from "@/lib/robots";
+import { FILTRADAS, PRIVADAS, ROBOS_IA_BUSCA, ROBOS_IA_TREINO, robotsFor } from "@/lib/robots";
+import nextConfig from "../next.config";
 import { buildSearch, toWebsearch, type EditalResumo } from "@/lib/search";
 
 const KEY = "k".repeat(40);
@@ -347,16 +348,38 @@ describe("destacar", () => {
 });
 
 describe("robots", () => {
-  it("disallows the private routes at a domain root", () => {
+  const grupos = (r: ReturnType<typeof robotsFor>) => (Array.isArray(r.rules) ? r.rules : [r.rules]);
+
+  it("disallows the private routes and the filtered listings at a domain root", () => {
     const r = robotsFor("https://exemplo.com.br");
     expect(r.sitemap).toBe("https://exemplo.com.br/sitemap.xml");
-    expect(r.rules).toEqual({ userAgent: "*", allow: "/", disallow: PRIVADAS });
+    expect(grupos(r)[0]).toEqual({ userAgent: "*", allow: "/", disallow: [...PRIVADAS, ...FILTRADAS] });
+  });
+
+  it("names every AI crawler and repeats the same paths for them", () => {
+    const [geral, ia] = grupos(robotsFor("https://exemplo.com.br"));
+    expect(ia.userAgent).toEqual(expect.arrayContaining(["GPTBot", "OAI-SearchBot", "ClaudeBot", "PerplexityBot", "Google-Extended"]));
+    expect({ allow: ia.allow, disallow: ia.disallow }).toEqual({ allow: geral.allow, disallow: geral.disallow });
   });
 
   it("prefixes every path under a sub-path deploy", () => {
     const r = robotsFor("https://apps.giovaniohira.com/radar/");
     expect(r.sitemap).toBe("https://apps.giovaniohira.com/radar/sitemap.xml");
-    expect(r.rules).toMatchObject({ allow: "/radar/", disallow: expect.arrayContaining(["/radar/painel", "/radar/entrar/confirmar"]) });
+    expect(grupos(r)[0]).toMatchObject({ allow: "/radar/", disallow: expect.arrayContaining(["/radar/painel", "/radar/entrar", "/radar/buscar?"]) });
+  });
+});
+
+describe("htmlLimitedBots", () => {
+  const re = nextConfig.htmlLimitedBots as RegExp;
+
+  it("puts the metadata in the <head> for every AI crawler named in robots.txt", () => {
+    for (const bot of [...ROBOS_IA_BUSCA, ...ROBOS_IA_TREINO]) expect(re.test(`Mozilla/5.0 (compatible; ${bot}/1.0)`), bot).toBe(true);
+    expect(re.test("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")).toBe(true);
+  });
+
+  it("keeps the crawlers Next already covered, and leaves people alone", () => {
+    for (const ua of ["Bingbot/2.0", "facebookexternalhit/1.1", "Twitterbot/1.0", "WhatsApp/2", "LinkedInBot/1.0"]) expect(re.test(ua), ua).toBe(true);
+    expect(re.test("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120 Safari/537.36")).toBe(false);
   });
 });
 
