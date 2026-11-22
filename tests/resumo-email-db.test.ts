@@ -92,9 +92,11 @@ describe.skipIf(!url)("resumo no e-mail (banco)", () => {
     expect((await montarDigests(db)).map((d) => d.email)).toEqual(["digest@teste.com"]);
     process.env.RESUMO_EMAIL_TETO_DIARIO = "10";
     // No Anthropic key and no network here: every generation fails, so nothing is stored and the e-mail still goes out.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response("", { status: 404 }))); // the real PNCP may be down (503 is retried with waits): keep the test hermetic
     const erro = vi.spyOn(console, "error").mockImplementation(() => {});
     const r = await prepararResumosDoDigest(db, { maxMs: 60_000 });
     erro.mockRestore();
+    vi.unstubAllGlobals();
     expect(r.escolhidos).toBe(3);
     expect(r.resumidos).toBe(0);
 
