@@ -5,11 +5,13 @@ import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { connection } from "next/server";
 import { Icon, Mark } from "@/components/icons";
+import { JsonLd } from "@/components/JsonLd";
 import { editalHref, type EditalLinha } from "@/components/ui";
 import { MAX_ALERTAS } from "@/lib/alerts";
 import { query } from "@/lib/db";
 import { DIAS_TESTE, EMPRESA, PRECO_MENSAL } from "@/lib/empresa";
 import { formatBRLCompact, formatDia, formatInt, frase, nome, tituloCurto } from "@/lib/format";
+import { landing, siteUrl } from "@/lib/schema";
 import { LIMITE_DIARIO } from "@/lib/summary";
 import { HeroCadastro } from "../entrar/LoginForm";
 import produtoBusca from "./produto-busca.webp";
@@ -146,6 +148,7 @@ function Kicker({ n, children }: { n: string; children: ReactNode }) {
 export default function Home() {
   return (
     <main id="conteudo">
+      <JsonLd data={landing(siteUrl(), FAQ)} />
       {/* Ink block: promise, sign-up, product preview and today's live PNCP numbers. */}
       <section className="hero on-ink">
         <div className="container">
