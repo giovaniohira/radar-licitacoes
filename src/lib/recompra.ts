@@ -131,14 +131,14 @@ export async function recomprasEnviadas(db: Consulta, userId: number, hoje: stri
 
 export const vazio = (r: Recompras | null | undefined) => !r || (r.itens.length === 0 && r.proprios.length === 0);
 
-export const TITULO_DA_SECAO = "Contratos do seu ramo que terminam em breve";
-export const AVISO_DA_SECAO = "Um contrato que termina pode ser prorrogado. Confira no PNCP antes de se preparar.";
+export const TITULO_DA_SECAO = "Contratos do seu ramo que terminam em 30 a 90 dias";
+export const AVISO_DA_SECAO = "Contrato que termina pode ser prorrogado, e nem sempre vira edital novo. Confira no PNCP antes de se preparar.";
 
 /** The current supplier, only when it is a company: an individual never appears by name. */
 export const fornecedorDe = (c: Pick<Contrato, "fornecedor" | "fornecedor_ni">): string | null =>
   c.fornecedor && c.fornecedor_ni && /^\d{14}$/.test(c.fornecedor_ni) ? nome(c.fornecedor) : null;
 
-export const linhaDoProprio = (c: Contrato) => `Seu contrato com ${nome(c.orgao)} termina em ${formatDia(c.vigencia_fim)}: a recompra deve vir aí.`;
+export const linhaDoProprio = (c: Contrato) => `Seu contrato com ${nome(c.orgao)} termina em ${formatDia(c.vigencia_fim)}. O órgão pode prorrogar ou abrir novo edital: vale acompanhar.`;
 
 /** The three lines of an item: what, who buys, who has it now and until when. */
 export function partesDoItem(c: Contrato) {
@@ -146,7 +146,7 @@ export function partesDoItem(c: Contrato) {
   return {
     objeto: tituloCurto(frase(c.objeto), 110),
     comprador: [nome(c.orgao), local(c.municipio, c.uf, c.orgao)].filter(Boolean).join(" · "),
-    detalhe: [forn && `Fornecedor atual: ${forn}`, c.valor_global ? formatBRL(c.valor_global) : null, `termina em ${formatDia(c.vigencia_fim)}`].filter(Boolean).join(" · "),
+    detalhe: [forn && `Fornecedor atual: ${forn}`, c.valor_global ? `Contrato de ${formatBRL(c.valor_global)}` : null, `termina em ${formatDia(c.vigencia_fim)}`].filter(Boolean).join(" · "),
   };
 }
 
@@ -176,7 +176,7 @@ export function htmlDaSecao(appUrl: string, r: Recompras, cores: { text: string;
 <div style="color:${cores.text};font-weight:600;font-size:14px;line-height:20px">${escapeHtml(p.objeto)}</div>
 <div style="font-size:12px;color:${cores.muted};margin-top:4px">${escapeHtml(p.comprador)}</div>
 <div style="font-size:13px;margin-top:6px">${escapeHtml(p.detalhe)}</div>
-<div>${link(c, "Ver órgão")}</div>
+<div>${link(c, "Ver compras do órgão")}</div>
 </td></tr>`;
     })
     .join("");

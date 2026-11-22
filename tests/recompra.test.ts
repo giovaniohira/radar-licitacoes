@@ -39,7 +39,7 @@ describe("linhas da recompra", () => {
     expect({ ...itemDoTeste, detalhe: sp(itemDoTeste.detalhe) }).toEqual({
       objeto: "Material de limpeza para as escolas municipais",
       comprador: "Prefeitura Municipal de Campinas · SP",
-      detalhe: "Fornecedor atual: Limpa Tudo Comercio LTDA · R$ 125.001 · termina em 10/02/2027",
+      detalhe: "Fornecedor atual: Limpa Tudo Comercio LTDA · Contrato de R$ 125.001 · termina em 10/02/2027",
     });
   });
 
@@ -49,11 +49,11 @@ describe("linhas da recompra", () => {
     expect(fornecedorDe(c({ fornecedor: "JOSE DA SILVA", fornecedor_ni: null }))).toBeNull();
     const p = partesDoItem(c({ fornecedor: "JOSE DA SILVA", fornecedor_ni: "12345678901" }));
     expect(p.detalhe).not.toMatch(/jose|silva/i);
-    expect(sp(p.detalhe)).toBe("R$ 125.001 · termina em 10/02/2027");
+    expect(sp(p.detalhe)).toBe("Contrato de R$ 125.001 · termina em 10/02/2027");
   });
 
   it("writes the own-contract line the spec asks for", () => {
-    expect(linhaDoProprio(c())).toBe("Seu contrato com Prefeitura Municipal de Campinas termina em 10/02/2027: a recompra deve vir aí.");
+    expect(linhaDoProprio(c())).toBe("Seu contrato com Prefeitura Municipal de Campinas termina em 10/02/2027. O órgão pode prorrogar ou abrir novo edital: vale acompanhar.");
   });
 });
 
@@ -82,7 +82,7 @@ describe("renderDigest com a seção de recompra", () => {
     expect(vazio({ itens: [], proprios: [] })).toBe(true);
     const so = renderDigest("https://x.test", grupos, new Date("2026-11-22T10:00:00Z"), new Map(), [], { itens: [], proprios: [c()] });
     expect(so.text).toContain("Seu contrato com Prefeitura Municipal de Campinas termina em 10/02/2027");
-    expect(so.html).toContain("a recompra deve vir aí.");
+    expect(so.html).toContain("O órgão pode prorrogar ou abrir novo edital: vale acompanhar.");
   });
 
   it("escapes what comes from the PNCP", () => {

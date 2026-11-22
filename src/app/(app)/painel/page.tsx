@@ -8,7 +8,7 @@ import { ROTULO_DO_SELO, estadoDaCertidao, hojeBR, listarCertidoes, nomeDaCertid
 import { pool, query } from "@/lib/db";
 import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazoTom, tituloCurto } from "@/lib/format";
 import { first } from "@/lib/params";
-import { partesDoItem, recomprasEnviadas, type Contrato } from "@/lib/recompra";
+import { AVISO_DA_SECAO, partesDoItem, recomprasEnviadas, type Contrato } from "@/lib/recompra";
 import { ETAPAS, etapaLabel, listPipeline, vencendo, type Etapa, type PipelineItem } from "@/lib/pipeline";
 import { buildSearch, type EditalResumo } from "@/lib/search";
 import { resumoConfigurado } from "@/lib/summary-tipos";
@@ -234,9 +234,9 @@ function CertidoesCard({ certidoes, itens }: { certidoes: Certidao[]; itens: Pip
 function RecomprasCard({ contratos }: { contratos: Contrato[] }) {
   if (!contratos.length) return null;
   return (
-    <section className="card card-pad stack" style={{ gap: 10 }} aria-label="Recompras à vista">
+    <section className="card card-pad stack" style={{ gap: 10 }} aria-label="Contratos que terminam em breve">
       <div className="card-title">
-        <h2>Recompras à vista</h2>
+        <h2>Contratos que terminam em breve</h2>
       </div>
       <ul className="recompra-lista">
         {contratos.map((c) => {
@@ -252,6 +252,7 @@ function RecomprasCard({ contratos }: { contratos: Contrato[] }) {
           );
         })}
       </ul>
+      <p className="xs subtle">{AVISO_DA_SECAO}</p>
     </section>
   );
 }
