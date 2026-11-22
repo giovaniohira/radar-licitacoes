@@ -4,7 +4,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
 import { Empty, Loading, PageHead, PrazoPill, editalHref, valorCurto } from "@/components/ui";
-import { ROTULO_DO_SELO, hojeBR, listarCertidoes, selosDoPipeline, textoDoSelo } from "@/lib/certidoes";
+import { hojeBR, listarCertidoes, rotuloDoSelo, selosDoPipeline, textoDoSelo } from "@/lib/certidoes";
 import { pool } from "@/lib/db";
 import { formatBRLCompact, formatData, formatInt, frase, nome, tituloCurto } from "@/lib/format";
 import { first } from "@/lib/params";
@@ -22,7 +22,7 @@ async function Pipeline({ searchParams }: PageProps<"/pipeline">) {
   const lista = first((await searchParams).view) === "lista";
   const itens = await listPipeline(pool(), user.id);
   const selos = selosDoPipeline(itens, await listarCertidoes(pool(), user.id), hojeBR());
-  const avisoDoSelo = Object.fromEntries([...selos].map(([id, cs]) => [id, textoDoSelo(cs)]));
+  const avisoDoSelo = Object.fromEntries([...selos].map(([id, s]) => [id, { rotulo: rotuloDoSelo(s.certidoes), aviso: textoDoSelo(s.certidoes, s.ate) }]));
   const ativos = itens.filter((i) => EM_DISPUTA.includes(i.etapa));
   const valor = ativos.reduce((s, i) => s + (i.valor_proposta ?? i.valor_estimado ?? 0), 0);
 
@@ -83,8 +83,9 @@ async function Pipeline({ searchParams }: PageProps<"/pipeline">) {
                         {i.uf && ` · ${i.uf}`}
                       </div>
                       {avisoDoSelo[i.edital_id] && (
-                        <span className="selo-cert" title={avisoDoSelo[i.edital_id]}>
-                          {ROTULO_DO_SELO}
+                        <span className="selo-cert" title={avisoDoSelo[i.edital_id].aviso}>
+                          <Icon name="alerta" size={12} />
+                          {avisoDoSelo[i.edital_id].rotulo}
                         </span>
                       )}
                     </td>

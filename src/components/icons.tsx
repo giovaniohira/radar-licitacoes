@@ -18,6 +18,7 @@ const PATHS = {
   sparkle: "M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8zM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z",
   copy: "M9 9h11v11H9zM5 15H4V4h11v1",
   certidao: "M7 3h8l4 4v14H7zM15 3v4h4M10 14l2 2 3.5-4",
+  alerta: "M12 4 2.5 20h19zM12 10v5M12 17.5v.5",
 } as const;
 
 export type IconName = keyof typeof PATHS;

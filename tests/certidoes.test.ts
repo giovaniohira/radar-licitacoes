@@ -10,6 +10,7 @@ import {
   nomeDaCertidao,
   selosDoPipeline,
   textoDoAviso,
+  rotuloDoSelo,
   textoDoSelo,
   validarEntrada,
   venceAntesDaSessao,
@@ -87,7 +88,7 @@ describe("avisos do e-mail", () => {
     expect(um.html).toContain("Ver minhas certidões");
     expect(um.text).toContain("https://x.test/certidoes");
     const dois = renderAvisoCertidoes("https://x.test", avisosDasCertidoes([cert("fgts", 3, 1), cert("trabalhista", 0, 2)], HOJE));
-    expect(dois.subject).toBe("2 certidões vencendo");
+    expect(dois.subject).toBe("2 certidões perto de vencer");
   });
 });
 
@@ -120,9 +121,12 @@ describe("selo: a certidão vence antes da sessão", () => {
     // The opening is when proposals start to be received: an old one must not hide a deadline that falls after the expiry.
     const antiga = [{ edital_id: "x", etapa: "analise", abertura: new Date("2026-11-10T13:00:00Z"), encerramento: new Date("2026-12-10T13:00:00Z") }];
     expect([...selosDoPipeline(antiga, cs, HOJE).keys()]).toEqual(["x"]);
-    expect(selos.get("a")!.map((c) => c.tipo)).toEqual(["fgts"]);
-    expect(selos.get("d")!.map((c) => c.tipo)).toEqual(["fgts"]); // the federal one is valid until 22/01/2027, after this session
-    expect(textoDoSelo(selos.get("a")!)).toBe("Vence antes da sessão: CRF do FGTS");
+    expect(selos.get("a")!.certidoes.map((c) => c.tipo)).toEqual(["fgts"]);
+    expect(selos.get("d")!.certidoes.map((c) => c.tipo)).toEqual(["fgts"]); // the federal one is valid until 22/01/2027, after this session
+    // The label names the certificate (phones have no hover); the hover text shows the two dates that were compared.
+    expect(rotuloDoSelo(selos.get("a")!.certidoes)).toBe("CRF do FGTS vence antes da sessão");
+    expect(textoDoSelo(selos.get("a")!.certidoes, selos.get("a")!.ate)).toBe("CRF do FGTS vence em 28/11. Propostas até 05/12.");
+    expect(rotuloDoSelo([cert("fgts", 5, 1), cert("federal", 6, 2)])).toBe("2 certidões vencem antes da sessão");
     expect(selosDoPipeline(itens, [], HOJE).size).toBe(0);
   });
 });

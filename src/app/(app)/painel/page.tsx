@@ -194,7 +194,7 @@ function CertidoesCard({ certidoes, itens }: { certidoes: Certidao[]; itens: Pip
         <Link href="/certidoes">{cadastradas ? "Ver todas" : "Cadastrar"}</Link>
       </div>
       {cadastradas === 0 ? (
-        <p className="small muted">Cadastre as datas das suas certidões. Avisamos antes de vencerem, e antes de uma sessão em que elas não valem mais.</p>
+        <p className="small muted">Cadastre até quando cada certidão vale. Avisamos por e-mail antes de vencer.</p>
       ) : (
         <ul className="cert-resumo">
           {TIPOS_FIXOS.map((t) => {
@@ -219,8 +219,10 @@ function CertidoesCard({ certidoes, itens }: { certidoes: Certidao[]; itens: Pip
       )}
       {selos.size > 0 && (
         <p className="small" style={{ paddingTop: 10, borderTop: "1px solid var(--line)" }}>
-          <span className="selo-cert">{ROTULO_DO_SELO}</span>{" "}
-          <Link href="/pipeline">{plural(selos.size, "disputa", "disputas")}</Link>
+          <span className="selo-cert">
+            <Icon name="alerta" size={12} />
+            <Link href="/pipeline">{plural(selos.size, "disputa", "disputas")}</Link> {ROTULO_DO_SELO}
+          </span>
         </p>
       )}
     </section>

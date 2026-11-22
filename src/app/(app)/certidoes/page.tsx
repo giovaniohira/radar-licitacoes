@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
 import { SubmitButton } from "@/components/SubmitButton";
+import { CampoData } from "./CampoData";
 import { Loading, PageHead } from "@/components/ui";
 import { MAX_OUTRAS, TIPOS_FIXOS, estadoDaCertidao, hojeBR, listarCertidoes, nomeDaCertidao, type Certidao } from "@/lib/certidoes";
 import { pool } from "@/lib/db";
@@ -41,7 +42,7 @@ async function Certidoes({ searchParams }: PageProps<"/certidoes">) {
     <div className="page narrow" style={{ gap: 20 }}>
       <PageHead
         title="Certidões"
-        sub="Cadastre até quando cada certidão vale. O Vencedital avisa por e-mail 7, 3 e 1 dia antes de vencer, e no dia, e marca as disputas cuja sessão cai depois do vencimento."
+        sub="Cadastre até quando cada certidão vale. Avisamos por e-mail 7, 3 e 1 dia antes de vencer, e no dia. Em Minhas disputas, marcamos os editais cuja sessão é depois do vencimento."
       />
       {first(sp.erro) && <div className="notice">{first(sp.erro)}</div>}
       {first(sp.ok) && <div className="notice ok">Certidão salva.</div>}
@@ -49,7 +50,7 @@ async function Certidoes({ searchParams }: PageProps<"/certidoes">) {
 
       <section className="card" aria-label="Certidões fixas">
         <div className="card-head">
-          <h2>As cinco de sempre</h2>
+          <h2>Regularidade fiscal e trabalhista</h2>
           <span className="xs subtle">Só a data: não guardamos o arquivo.</span>
         </div>
         <ul className="cert-lista">
@@ -63,12 +64,7 @@ async function Certidoes({ searchParams }: PageProps<"/certidoes">) {
                 </div>
                 <form action={salvarCertidaoForm} className="cert-form">
                   <input type="hidden" name="tipo" value={t.id} />
-                  <label className="cert-data">
-                    <span className="sr-only">Válida até, {t.nome}</span>
-                    <span className="xs muted">Válida até</span>
-                    <input className="input" type="date" name="valida_ate" defaultValue={c?.valida_ate ?? ""} required min="2000-01-01" max="2100-12-31" />
-                  </label>
-                  <SubmitButton className="btn btn-primary btn-sm">Salvar</SubmitButton>
+                  <CampoData rotulo={t.nome} inicial={c?.valida_ate ?? ""} />
                 </form>
                 <div className="cert-acoes">
                   {t.link ? (
@@ -88,8 +84,8 @@ async function Certidoes({ searchParams }: PageProps<"/certidoes">) {
 
       <section className="card" aria-label="Outras certidões" id="outra">
         <div className="card-head">
-          <h2>Outras</h2>
-          <span className="xs subtle">Atestados, alvarás, registros.</span>
+          <h2>Outras certidões</h2>
+          <span className="xs subtle">Alvarás, atestados e o que mais tiver data de validade.</span>
         </div>
         {outras.length > 0 && (
           <ul className="cert-lista">
@@ -102,12 +98,7 @@ async function Certidoes({ searchParams }: PageProps<"/certidoes">) {
                 <form action={salvarCertidaoForm} className="cert-form">
                   <input type="hidden" name="id" value={c.id} />
                   <input type="hidden" name="tipo" value="outra" />
-                  <label className="cert-data">
-                    <span className="sr-only">Válida até, {nomeDaCertidao(c)}</span>
-                    <span className="xs muted">Válida até</span>
-                    <input className="input" type="date" name="valida_ate" defaultValue={c.valida_ate} required min="2000-01-01" max="2100-12-31" />
-                  </label>
-                  <SubmitButton className="btn btn-sm">Salvar</SubmitButton>
+                  <CampoData rotulo={nomeDaCertidao(c)} inicial={c.valida_ate} />
                 </form>
                 <div className="cert-acoes">
                   <Apagar id={c.id} rotulo={nomeDaCertidao(c)} />
@@ -125,7 +116,7 @@ async function Certidoes({ searchParams }: PageProps<"/certidoes">) {
             </label>
             <label className="field" style={{ flex: "1 1 160px" }}>
               Válida até
-              <input className="input" type="date" name="valida_ate" required min="2000-01-01" max="2100-12-31" />
+              <input className="input" type="date" lang="pt-BR" name="valida_ate" required min="2000-01-01" max="2100-12-31" />
             </label>
             <SubmitButton className="btn">
               <Icon name="plus" size={15} /> Outra certidão

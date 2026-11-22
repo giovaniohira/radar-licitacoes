@@ -46,7 +46,7 @@ function Pill({ i }: { i: PipelineItem }) {
   return i.encerramento ? <PrazoPill d={i.encerramento} /> : <span className="pill">sem prazo</span>;
 }
 
-export function Board({ inicial, selos = {} }: { inicial: PipelineItem[]; selos?: Record<string, string> }) {
+export function Board({ inicial, selos = {} }: { inicial: PipelineItem[]; selos?: Record<string, { rotulo: string; aviso: string }> }) {
   const [itens, setItens] = useState(inicial);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null); // column under the pointer, for the highlight
@@ -142,8 +142,9 @@ export function Board({ inicial, selos = {} }: { inicial: PipelineItem[]; selos?
                     <Pill i={i} />
                   </span>
                   {selos[i.edital_id] && (
-                    <span className="selo-cert" title={selos[i.edital_id]}>
-                      Certidão vence antes da sessão
+                    <span className="selo-cert" title={selos[i.edital_id].aviso}>
+                      <Icon name="alerta" size={12} />
+                      {selos[i.edital_id].rotulo}
                     </span>
                   )}
                   <span className="passo">

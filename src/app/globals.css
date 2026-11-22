@@ -824,18 +824,22 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .cert-form { display: flex; align-items: flex-end; gap: 8px; }
 .cert-data { display: flex; flex-direction: column; gap: 2px; }
 .cert-data .input { height: 36px; width: 160px; }
+.cert-form .btn { height: 36px; }
 .cert-acoes { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 120px; }
 .cert-nova { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px; border-top: 1px solid var(--line); }
 .pill.cert-ok { background: var(--ok-soft); color: var(--ok); }
-.pill.cert-warn { background: #fff4e5; color: #9a3412; }
+.pill.cert-warn { background: var(--brand-soft); color: var(--brand-text); }
 .pill.cert-danger { background: var(--danger-soft); color: var(--danger); }
-.selo-cert { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: var(--r); font-size: 11.5px; font-weight: 550; line-height: 18px; background: #fff4e5; color: #9a3412; }
+.selo-cert { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: var(--r); font-size: 11.5px; font-weight: 550; line-height: 18px; background: var(--brand-soft); color: var(--brand-text); }
 @media (max-width: 720px) {
   .cert-linha { grid-template-columns: 1fr; }
   .cert-form { flex-wrap: wrap; }
   .cert-data .input { width: 100%; min-width: 150px; }
   .cert-data { flex: 1 1 150px; }
-  .cert-acoes { justify-content: flex-start; min-width: 0; }
+  .cert-data .input, .cert-form .btn { height: 44px; }
+  .cert-acoes { justify-content: flex-start; min-width: 0; gap: 8px; }
+  .cert-acoes a, .cert-acoes .btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; }
+  .cert-acoes .btn { height: 44px; }
 }
 
 .cert-resumo { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

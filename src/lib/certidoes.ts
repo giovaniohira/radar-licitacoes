@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { formatDia } from "./format";
 
 /**
  * "Certidões em dia": the validity date of the certificates a company needs to bid. Dates are plain "YYYY-MM-DD"
@@ -165,6 +166,12 @@ export async function marcarAvisadas(db: Pool, ids: number[], hoje: string): Pro
   await db.query(`insert into certidao_avisos (certidao_id, dia) select unnest($1::int[]), $2::date on conflict do nothing`, [ids, hoje]);
 }
 
+export interface Selo {
+  certidoes: Certidao[];
+  /** The date compared with the expiry: the later of the opening and the deadline. */
+  ate: Date | string;
+}
+
 /** The stages in which a card still has a session ahead (everything but the finished ones). */
 const ETAPAS_COM_SESSAO_PENDENTE = ["triagem", "analise", "preparando", "enviada"];
 
@@ -178,8 +185,8 @@ export function selosDoPipeline(
   itens: { edital_id: string; etapa: string; abertura: Date | string | null; encerramento: Date | string | null }[],
   cs: Certidao[],
   hoje: string,
-): Map<string, Certidao[]> {
-  const out = new Map<string, Certidao[]>();
+): Map<string, Selo> {
+  const out = new Map<string, Selo>();
   if (!cs.length) return out;
   for (const i of itens) {
     if (!ETAPAS_COM_SESSAO_PENDENTE.includes(i.etapa)) continue;
@@ -187,10 +194,24 @@ export function selosDoPipeline(
     if (!datas.length) continue;
     const sessao = datas.reduce((a, b) => (new Date(a).getTime() >= new Date(b).getTime() ? a : b));
     const vencem = venceAntesDaSessao(cs, sessao, hoje);
-    if (vencem.length) out.set(i.edital_id, vencem);
+    if (vencem.length) out.set(i.edital_id, { certidoes: vencem, ate: sessao });
   }
   return out;
 }
 
-export const textoDoSelo = (cs: Certidao[]) => `Vence antes da sessão: ${cs.map(nomeDaCertidao).join(", ")}`;
-export const ROTULO_DO_SELO = "Certidão vence antes da sessão";
+const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const maiuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** The text on the card itself (phones have no hover): which certificate, or how many. */
+export const rotuloDoSelo = (cs: Certidao[]) =>
+  cs.length === 1 ? `${maiuscula(nomeDaCertidao(cs[0]))} vence antes da sessão` : `${cs.length} certidões vencem antes da sessão`;
+
+/**
+ * The hover text: the dates we compared, so the user can check them. "Propostas até" is the later of the opening and the
+ * deadline (see selosDoPipeline); we do not claim a session date we do not have.
+ */
+export const textoDoSelo = (cs: Certidao[], ate: Date | string) =>
+  `${cs.map((c) => `${maiuscula(nomeDaCertidao(c))} vence em ${dm(c.valida_ate)}`).join("; ")}. Propostas até ${formatDia(ate).slice(0, 5)}.`;
+
+/** The Hoje card: "2 disputas com certidão que vence antes da sessão". */
+export const ROTULO_DO_SELO = "com certidão que vence antes da sessão";

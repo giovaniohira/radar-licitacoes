@@ -65,14 +65,14 @@ export interface AvisoCertidao {
 export const avisosDasCertidoes = (cs: Certidao[], hoje: string): AvisoCertidao[] =>
   certidoesParaAvisar(cs, hoje).map((c) => ({ texto: textoDoAviso(c, hoje), link: linkDaCertidao(c) }));
 
-const linhaDeAviso = (a: AvisoCertidao) => `<div style="margin-top:6px"><b>${escapeHtml(a.texto)}</b>${a.link ? ` <a href="${escapeHtml(a.link)}" style="color:${C.accent};font-weight:600">Emitir →</a>` : ""}</div>`;
+const linhaDeAviso = (a: AvisoCertidao) => `<div style="margin-top:6px"><b>${escapeHtml(a.texto)}</b>${a.link ? ` <a href="${escapeHtml(a.link)}" style="display:inline-block;padding:10px 6px;color:${C.accent};font-weight:600;text-decoration:underline">Emitir →</a>` : ""}</div>`;
 
 /** The top-of-e-mail block, or "" when there is nothing to warn about. */
 const blocoDeAvisos = (avisos: AvisoCertidao[]) =>
   avisos.length
     ? `<tr><td style="padding:14px 24px;background:#fff7ed;border-bottom:1px solid ${C.border};font-size:13px;line-height:19px;color:${C.text}">
 <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.warn}">Certidões</div>${avisos.map(linhaDeAviso).join("")}
-<div style="margin-top:6px"><a href="__APP__/certidoes" style="color:${C.muted}">Ver minhas certidões</a></div>
+<div style="margin-top:2px"><a href="__APP__/certidoes" style="display:inline-block;padding:10px 0;color:${C.muted};text-decoration:underline">Ver minhas certidões</a></div>
 </td></tr>`
     : "";
 
@@ -244,7 +244,7 @@ export async function prepararResumosDoDigest(
  * digest: plain tables, inline styles, a text version.
  */
 export function renderAvisoCertidoes(appUrl: string, avisos: AvisoCertidao[]): Omit<Mail, "to"> {
-  const subject = avisos.length === 1 ? avisos[0].texto.replace(/\.$/, "") : `${avisos.length} certidões vencendo`;
+  const subject = avisos.length === 1 ? avisos[0].texto.replace(/\.$/, "") : `${avisos.length} certidões perto de vencer`;
   const text = [subject, "", ...avisos.map((a) => `- ${a.texto}${a.link ? ` Emitir: ${a.link}` : ""}`), "", `Minhas certidões: ${appUrl}/certidoes`].join("\n");
   const html = `<!doctype html><html><body style="margin:0;background:${C.bg}">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${C.text}">
