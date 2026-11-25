@@ -448,10 +448,10 @@ describe("quem ganhou: palavras do objeto", () => {
   it("keeps the distinctive words, without accents, in order, dropping boilerplate and the buyer's own name", () => {
     expect(termosDoObjeto("Contratação de empresa especializada para a prestação de serviços de manutenção preventiva e corretiva de veículos")).toEqual([
       "manutencao",
-      "preventiva",
-      "corretiva",
       "veiculos",
     ]);
+    // Procurement form ("credenciamento", "adesão", "empenho") and modifiers ("corretiva", "instalação") are not the object.
+    expect(termosDoObjeto("Credenciamento de empresas para instalação e manutenção corretiva de redes de proteção")).toEqual(["manutencao", "redes", "protecao"]);
     // The buyer's name and city are in every one of its contracts, so they say nothing about what is bought.
     expect(termosDoObjeto("Aquisição de colchão para o Hospital de Criciúma", "MUNICIPIO DE CRICIUMA Hospital")).toEqual(["colchao"]);
   });

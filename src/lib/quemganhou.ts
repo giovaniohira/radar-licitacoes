@@ -26,7 +26,9 @@ const GENERICAS = new Set(
    toda todo todos todas outro uns umas nao mais menos muito mediante visto devendo deverao dever possui possuir
    capacidade caracteristicas caracteristica planilha projeto projetos contempladas operacionais conveniencia periodicas
    periodicos periodica periodico executivo basico basica especializados tecnicos tecnica tecnicas tecnico elaboracao
-   selecao propostas proposta consiste formalizacao convocacao interessados procedimento procedimentos portaria`
+   selecao propostas proposta consiste formalizacao convocacao interessados procedimento procedimentos portaria
+   credenciamento credenciar credenciada credenciadas credenciado credenciados adesao empenho emergencial emergencia
+   preventiva preventivo corretiva corretivo instalacao adequacao finalidade anuencia`
     .split(/\s+/)
     .filter(Boolean),
 );
@@ -109,14 +111,19 @@ export const SQL_QUEM_GANHOU = `with q as (select to_tsquery('portuguese', f_una
             where k.orgao_cnpj = $1 and k.tipo_pessoa <> 'PF' and k.fornecedor is not null
               and k.busca @@ to_tsquery('portuguese', $6)
           ),
+          -- Only contracts within one word of the best match: a buyer with a close match should not also list loose ones.
+          ok as (
+            select * from m where acertos >= $3 and da_cabeca >= 1
+              and acertos >= (select max(acertos) from m where acertos >= $3 and da_cabeca >= 1) - 1
+          ),
           s as (
             select count(*) as total, min(data_assinatura)::text as desde,
                    (min(valor_global) filter (where valor_global > 0))::float8 as vmin,
                    (max(valor_global) filter (where valor_global > 0))::float8 as vmax
-            from m where acertos >= $3 and da_cabeca >= 1
+            from ok
           ),
           top as (
-            select * from m where acertos >= $3 and da_cabeca >= 1 order by acertos desc, data_assinatura desc nulls last, valor_global desc nulls last limit $4
+            select * from ok order by acertos desc, data_assinatura desc nulls last, valor_global desc nulls last limit $4
           )
      select top.id, top.objeto, top.fornecedor, top.fornecedor_ni, top.valor_global::float8 as valor_global,
             top.data_assinatura::text as data_assinatura, top.compra_id,
