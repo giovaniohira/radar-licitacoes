@@ -21,7 +21,7 @@ import { AVISO_DIGEST, renderDigest, type Alert } from "@/lib/alerts";
 import { mascaraCnpj } from "@/lib/cnpj";
 import { consultarCnpj, formatCnae, palavrasDoHistorico, setoresDoCnae, setoresSugeridos } from "@/lib/cnpj-publico";
 import { quemSomos } from "@/lib/empresa";
-import { destacar, formatBRL, formatDia, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
+import { destacar, formatBRL, formatDia, formatMesAno, frase, local, nome, prazo, prazoTom, tituloCurto } from "@/lib/format";
 import { dias, hojeBR } from "@/lib/ingest";
 import { parseFiltros, parseValor, withParams } from "@/lib/params";
 import { whereContratos } from "@/lib/mercado";
@@ -470,6 +470,14 @@ describe("quem ganhou: palavras do objeto", () => {
     // Every pair has one of the two leading words, so a contract that matches only trailing words is never required.
     expect(prefiltroGin(["aaaa", "bbbb", "cccc", "dddd"])).toBe("(aaaa & bbbb) | (aaaa & cccc) | (aaaa & dddd) | (bbbb & cccc) | (bbbb & dddd)");
     expect(prefiltroGin([])).toBe("");
+  });
+});
+
+describe("formatMesAno", () => {
+  it("names the month in Brasília time", () => {
+    expect(formatMesAno("2026-07-23T03:00:31+00:00")).toBe("julho de 2026");
+    expect(formatMesAno("2026-08-01T01:00:00Z")).toBe("julho de 2026"); // still July 31 in Brasília
+    expect(formatMesAno(null)).toBe("—");
   });
 });
 

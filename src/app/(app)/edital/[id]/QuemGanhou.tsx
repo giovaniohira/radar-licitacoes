@@ -4,8 +4,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { editalHref } from "@/components/ui";
 import { ehCnpj } from "@/lib/concorrentes";
 import { pool } from "@/lib/db";
-import { formatBRL, formatDia, frase, nome, tituloCurto } from "@/lib/format";
-import { quemGanhou, termosDoObjeto } from "@/lib/quemganhou";
+import { formatBRL, formatDia, formatMesAno, frase, nome, tituloCurto } from "@/lib/format";
+import { contratoMaisAntigo, quemGanhou, termosDoObjeto } from "@/lib/quemganhou";
 import { seguirForm } from "../../../actions/concorrentes";
 
 // The lookup reads the buyer's contracts through two indexes; on the production database a cold run can take seconds,
@@ -14,6 +14,13 @@ async function buscar(cnpj: string, termos: string[]) {
   "use cache";
   cacheLife("hours");
   return quemGanhou(pool(), cnpj, termos);
+}
+
+// How far back the contracts go changes only when an older month is loaded.
+async function desdeQuando() {
+  "use cache";
+  cacheLife("hours");
+  return contratoMaisAntigo(pool());
 }
 
 /** A contract value; PNCP uses 0 for "not informed", which formatBRL would print as "Sigiloso". */
@@ -25,6 +32,7 @@ const valor = (v: number | null) => (v && v > 0 ? formatBRL(v) : "—");
  */
 export async function QuemJaGanhou({ cnpj, objeto, excluir }: { cnpj: string; objeto: string; excluir: string }) {
   const r = await buscar(cnpj, termosDoObjeto(objeto, excluir));
+  const desde = r.contratos.length === 0 ? await desdeQuando() : null;
   return (
     <section className="card" aria-labelledby="quemganhou-h" style={{ overflow: "hidden" }}>
       <div className="card-head">
@@ -35,7 +43,8 @@ export async function QuemJaGanhou({ cnpj, objeto, excluir }: { cnpj: string; ob
       </div>
       {r.contratos.length === 0 ? (
         <p className="card-body small muted">
-          Não achamos contratos parecidos deste órgão no PNCP. Olhamos os contratos publicados desde julho de 2026.
+          Não achamos contratos parecidos deste órgão no PNCP.
+          {desde && <> Olhamos os contratos publicados desde {formatMesAno(desde)}.</>}
         </p>
       ) : (
         <>

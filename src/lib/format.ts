@@ -4,6 +4,7 @@ const int = new Intl.NumberFormat("pt-BR");
 const dataHora = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
 const dataCurta = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "short" });
 const soData = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short" });
+const mesAno = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", month: "long", year: "numeric" });
 
 export function formatBRL(v: number | string | null | undefined): string {
   // PNCP reports secret budgets ("orçamento sigiloso") as 0.
@@ -29,6 +30,12 @@ const asDate = (d: Date | string) => (typeof d === "string" && /^\d{4}-\d{2}-\d{
 export function formatDia(d: Date | string | null | undefined): string {
   if (!d) return "—";
   return soData.format(asDate(d));
+}
+
+/** "julho de 2026", in Brasília time. */
+export function formatMesAno(d: Date | string | null | undefined): string {
+  if (!d) return "—";
+  return mesAno.format(asDate(d));
 }
 
 export function formatDiaCurto(d: Date | string | null | undefined): string {
