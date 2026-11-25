@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { pausaParaRitmo } from "@/lib/ingest";
 import {
   formatCnpj,
   hashSenha,
@@ -538,5 +539,18 @@ describe("CNPJ public data", () => {
       throw new Error("timeout");
     }) as typeof fetch;
     expect(await consultarCnpj("68631511000145", down)).toBeNull();
+  });
+});
+
+describe("pausaParaRitmo", () => {
+  it("pauses so writes take at most the given share of the time", () => {
+    expect(pausaParaRitmo(1000, 0.2)).toBe(4000);
+    expect(pausaParaRitmo(300, 0.5)).toBe(300);
+  });
+
+  it("does not pause without a valid ritmo", () => {
+    expect(pausaParaRitmo(1000)).toBe(0);
+    expect(pausaParaRitmo(1000, 0)).toBe(0);
+    expect(pausaParaRitmo(1000, 1)).toBe(0);
   });
 });
