@@ -147,16 +147,23 @@ describe.skipIf(!url)("database", () => {
       await novo("qg-a-pf", A, "Seguro veicular contratado de pessoa física", { dia: "2026-10-01", pf: true });
       await novo("qg-a-uma-palavra", A, "Aquisição de seguro de vida", { dia: "2026-10-02" }); // shares only "seguro"
       await novo("qg-a-outro-assunto", A, "Pavimentação asfáltica de vias urbanas", { dia: "2026-10-03" });
+      // Matches all four words, so the two-word match below is too loose to list next to it.
+      await novo("qg-a-quatro", A, "Seguro veicular de viatura administrativa", { dia: "2026-08-01" });
+      await novo("qg-a-duas", A, "Seguro veicular de ônibus escolar", { dia: "2026-10-05" });
       await novo("qg-b1", B, "Contratação de seguro veicular para viatura", { dia: "2026-10-04" }); // another buyer
 
       const termos = termosDoObjeto("Contratação de seguro veicular para viatura administrativa");
       expect(termos).toEqual(["seguro", "veicular", "viatura", "administrativa"]);
       const r = await quemGanhou(db, A, termos);
 
-      expect(r.total).toBe(8); // 7 + the one linked to an edital; the individual, the one-word match, and buyer B do not count
+      // 7 + the one linked to an edital + the four-word one; the individual, the one-word match, the two-word match
+      // (two words below the best) and buyer B do not count.
+      expect(r.total).toBe(9);
+      expect(r.contratos.map((c) => c.id)).toContain("qg-a-quatro");
+      expect(r.contratos.map((c) => c.id)).not.toContain("qg-a-duas");
       expect(r.contratos.map((c) => c.id)).toContain("qg-a-edital"); // as relevant as the others and the newest
       expect(r.contratos).toHaveLength(5);
-      expect(r.contratos.every((c) => c.id.startsWith("qg-a") && c.id !== "qg-a-pf" && c.id !== "qg-a-uma-palavra")).toBe(true);
+      expect(r.contratos.every((c) => c.id.startsWith("qg-a") && c.id !== "qg-a-pf" && c.id !== "qg-a-uma-palavra" && c.id !== "qg-a-duas")).toBe(true);
       const datas = r.contratos.map((c) => c.data_assinatura);
       expect(datas).toEqual([...datas].sort().reverse()); // newest first
       expect(datas[0]).toBe("2026-09-01");
