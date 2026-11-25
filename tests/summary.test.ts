@@ -23,7 +23,7 @@ describe("summarizePdf", () => {
   it("sends the PDF as a base64 document with structured output and fallbacks", async () => {
     const { client, parse } = fakeClient({ stop_reason: "end_turn", parsed_output: resumo, model: "claude-opus-5-5" });
     const out = await summarizePdf(Buffer.from("%PDF-1.7 teste"), client);
-    expect(out).toEqual({ resumo, modelo: "claude-opus-5-5" });
+    expect(out).toEqual({ resumo, modelo: "claude-opus-5-5", uso: { entrada: 0, saida: 0 } });
 
     const req = parse.mock.calls[0][0];
     expect(req.model).toBe("claude-opus-5-5");
