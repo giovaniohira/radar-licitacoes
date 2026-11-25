@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
 import { EditalRow, EditalRows, Empty, Interesse, Loading, editalHref } from "@/components/ui";
 import { ROTULO_DO_SELO, estadoDaCertidao, hojeBR, listarCertidoes, nomeDaCertidao, selosDoPipeline, TIPOS_FIXOS, type Certidao } from "@/lib/certidoes";
 import { pool, query } from "@/lib/db";
 import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazoTom, tituloCurto } from "@/lib/format";
+import { COOKIE_SEGUIR } from "@/lib/concorrentes";
 import { first } from "@/lib/params";
 import { AVISO_DA_SECAO, partesDoItem, recomprasEnviadas, type Contrato } from "@/lib/recompra";
 import { ETAPAS, etapaLabel, listPipeline, vencendo, type Etapa, type PipelineItem } from "@/lib/pipeline";
@@ -260,6 +263,8 @@ function RecomprasCard({ contratos }: { contratos: Contrato[] }) {
 async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchParams">) {
   await connection();
   const user = await requireUser();
+  // "Acompanhar" clicked before the account existed: finish it and go back to the company (see /seguir/retorno).
+  if ((await cookies()).get(COOKIE_SEGUIR)) redirect("/seguir/retorno");
   const sp = await searchParams;
   const aba = first(sp.alerta);
   const [itens, alerts, [{ resumiu }], certidoes, recompras] = await Promise.all([

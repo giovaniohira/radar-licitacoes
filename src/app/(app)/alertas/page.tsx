@@ -4,13 +4,15 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Empty, Loading, PageHead } from "@/components/ui";
-import { query } from "@/lib/db";
-import { formatBRLCompact, formatInt, horasAtras } from "@/lib/format";
+import { MAX_CONCORRENTES, listarSeguidos } from "@/lib/concorrentes";
+import { pool, query } from "@/lib/db";
+import { formatBRLCompact, formatDia, formatInt, horasAtras, nome } from "@/lib/format";
 import { first } from "@/lib/params";
 import { MODALIDADES } from "@/lib/pncp";
 import { buildSearch } from "@/lib/search";
 import { requireUser } from "@/lib/session";
 import { alternarAlerta, excluirAlerta } from "../../actions/alertas";
+import { pararForm } from "../../actions/concorrentes";
 import { NovoAlerta } from "./NovoAlerta";
 
 export const metadata: Metadata = { title: "Alertas", robots: { index: false } };
@@ -72,6 +74,7 @@ async function Alertas({ searchParams }: PageProps<"/alertas">) {
       return { abertos: Number(abertos[0]?.total ?? 0), novos: Number(novos[0]?.total ?? 0) };
     }),
   );
+  const seguidos = await listarSeguidos(pool(), user.id);
   const erro = first(sp.erro);
   const salvo = first(sp.salvo);
   const editar = alerts.find((a) => String(a.id) === first(sp.editar));
@@ -80,6 +83,7 @@ async function Alertas({ searchParams }: PageProps<"/alertas">) {
     <div className="page" style={{ gap: 20 }}>
       <PageHead title="Alertas" sub="No máximo um e-mail por dia, às 7h, só com editais que você ainda não recebeu." />
       {salvo && <div className="notice ok">{salvo === "editado" ? "Alerta atualizado." : "Busca salva como alerta."}</div>}
+      {first(sp.parou) && <div className="notice ok">Você parou de acompanhar essa empresa.</div>}
       {erro && <div className="notice">{erro}</div>}
 
       <div className="cols">
@@ -134,6 +138,41 @@ async function Alertas({ searchParams }: PageProps<"/alertas">) {
             ))
           )}
           <p className="small subtle">Dica: em qualquer busca, use “Salvar como alerta” para criar um alerta com os mesmos filtros.</p>
+
+          <section className="card card-pad stack" style={{ gap: 10 }} aria-labelledby="concorrentes-h">
+            <div className="card-title">
+              <h2 id="concorrentes-h">Concorrentes acompanhados</h2>
+              <span className="xs subtle">
+                {seguidos.length} de {MAX_CONCORRENTES}
+              </span>
+            </div>
+            {seguidos.length === 0 ? (
+              <p className="small muted">
+                Abra a página de uma empresa e clique em Acompanhar: os contratos novos dela chegam no e-mail das 7h. <Link href="/mercado">Ver o mercado</Link>
+              </p>
+            ) : (
+              <ul className="seguidos-lista">
+                {seguidos.map((s) => (
+                  <li key={s.fornecedor_ni}>
+                    <span style={{ minWidth: 0 }}>
+                      <Link href={`/fornecedor/${s.fornecedor_ni}`} className="t">
+                        {nome(s.nome) || s.fornecedor_ni}
+                      </Link>
+                      <span className="xs muted" style={{ display: "block" }}>
+                        desde {formatDia(s.criado_em)}
+                      </span>
+                    </span>
+                    <form action={pararForm}>
+                      <input type="hidden" name="ni" value={s.fornecedor_ni} />
+                      <SubmitButton className="btn btn-ghost btn-sm" aria-label={`Parar de acompanhar ${nome(s.nome)}`}>
+                        Parar de acompanhar
+                      </SubmitButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
         <div className="col-side">
           <NovoAlerta key={editar?.id ?? "novo"} editar={editar} />
