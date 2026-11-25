@@ -1,8 +1,11 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
+import { avisosPendentes, certidoesParaAvisar, hojeBR as hojeDasCertidoes, linkDaCertidao, marcarAvisadas, textoDoAviso, type Certidao } from "./certidoes";
 import { escapeHtml, sendMail, type Mail } from "./mail";
 import { EMPRESA } from "./empresa";
 import { formatBRL, formatData, frase, local, nome, prazo } from "./format";
 import type { EditalRow } from "./pncp";
+import * as Conc from "./concorrentes";
+import { htmlDaSecao, marcarEnviadas, recomprasDoUsuario, textoDaSecao, vazio, type Recompras } from "./recompra";
 import { blocoDoResumo, escolherParaResumo, resumoParaEmail, resumosDoCache, tetoDiario } from "./resumo-email";
 import { buildSearch, type EditalResumo } from "./search";
 import type { Resumo } from "./summary";
@@ -55,9 +58,42 @@ const C = { text: "#18181b", muted: "#5f5f6b", border: "#e6e6e9", accent: "#1e29
 /** One e-mail's alert groups. */
 type Grupos = { alert: Alert; editais: EditalResumo[] }[];
 
-export function renderDigest(appUrl: string, grupos: Grupos, now = new Date(), resumos: Map<string, Resumo> = new Map()): Omit<Mail, "to"> {
+/** A line at the top of an e-mail: "Sua CRF do FGTS vence em 3 dias." and where to renew it, when we know. */
+export interface AvisoCertidao {
+  texto: string;
+  link: string | null;
+}
+
+export const avisosDasCertidoes = (cs: Certidao[], hoje: string): AvisoCertidao[] =>
+  certidoesParaAvisar(cs, hoje).map((c) => ({ texto: textoDoAviso(c, hoje), link: linkDaCertidao(c) }));
+
+const linhaDeAviso = (a: AvisoCertidao) => `<div style="margin-top:6px"><b>${escapeHtml(a.texto)}</b>${a.link ? ` <a href="${escapeHtml(a.link)}" style="display:inline-block;padding:10px 6px;color:${C.accent};font-weight:600;text-decoration:underline">Emitir →</a>` : ""}</div>`;
+
+/** The top-of-e-mail block, or "" when there is nothing to warn about. */
+const blocoDeAvisos = (avisos: AvisoCertidao[]) =>
+  avisos.length
+    ? `<tr><td style="padding:14px 24px;background:#fff7ed;border-bottom:1px solid ${C.border};font-size:13px;line-height:19px;color:${C.text}">
+<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.warn}">Certidões</div>${avisos.map(linhaDeAviso).join("")}
+<div style="margin-top:2px"><a href="__APP__/certidoes" style="display:inline-block;padding:10px 0;color:${C.muted};text-decoration:underline">Ver minhas certidões</a></div>
+</td></tr>`
+    : "";
+
+
+export function renderDigest(
+  appUrl: string,
+  grupos: Grupos,
+  now = new Date(),
+  resumos: Map<string, Resumo> = new Map(),
+  avisos: AvisoCertidao[] = [],
+  recompras: Recompras | null = null,
+  concorrentes: Conc.Concorrentes | null = null,
+): Omit<Mail, "to"> {
   const total = grupos.reduce((n, g) => n + g.editais.length, 0);
-  const subject = `${total} ${total === 1 ? "novo edital" : "novos editais"} para você`;
+  const nConc = concorrentes ? concorrentes.itens.length + concorrentes.alemDoLimite : 0;
+  const subject =
+    total === 0 && nConc > 0
+      ? `${nConc} ${nConc === 1 ? "contrato novo" : "contratos novos"} das empresas que você acompanha`
+      : `${total} ${total === 1 ? "novo edital" : "novos editais"} para você`;
   const link = (e: EditalResumo) => `${appUrl}/edital/${encodeURIComponent(e.id)}`;
   const quando = (e: EditalResumo) =>
     e.encerramento ? `propostas até ${formatData(e.encerramento)} (${prazo(e.encerramento, now)})` : "prazo não informado no PNCP";
@@ -87,6 +123,7 @@ export function renderDigest(appUrl: string, grupos: Grupos, now = new Date(), r
 
   const text = [
     subject,
+    ...(avisos.length ? [`\nCertidões:\n${avisos.map((a) => `- ${a.texto}${a.link ? ` Emitir: ${a.link}` : ""}`).join("\n")}`] : []),
     ...grupos.map(
       (g) =>
         `\n## ${g.alert.nome}\n\n` +
@@ -102,6 +139,8 @@ export function renderDigest(appUrl: string, grupos: Grupos, now = new Date(), r
           })
           .join("\n\n"),
     ),
+    ...(Conc.vazio(concorrentes) ? [] : [Conc.textoDaSecao(appUrl, concorrentes!)]),
+    ...(vazio(recompras) ? [] : [textoDaSecao(appUrl, recompras!)]),
     `\nGerenciar alertas: ${appUrl}/alertas`,
     `\n${AVISO_DIGEST}`,
   ].join("\n");
@@ -137,7 +176,7 @@ ${b.atencao.map((a) => `<div style="margin-top:4px;color:${C.warn}"><b>Atenção
 <span style="font-weight:700;color:${C.accent}">Vencedital</span>
 <div style="font-size:20px;font-weight:700;margin-top:8px">${escapeHtml(subject)}</div>
 </td></tr>
-${grupos
+${blocoDeAvisos(avisos).replaceAll("__APP__", appUrl)}${grupos
   .map(
     (g) => `<tr><td style="padding:16px 24px 0">
 <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.muted}">${escapeHtml(g.alert.nome)} · ${g.editais.length}</div>
@@ -145,19 +184,22 @@ ${grupos
 </td></tr>`,
   )
   .join("")}
-<tr><td style="padding:20px 24px">
+${Conc.vazio(concorrentes) ? "" : Conc.htmlDaSecao(appUrl, concorrentes!, C)}${vazio(recompras) ? "" : htmlDaSecao(appUrl, recompras!, C)}<tr><td style="padding:20px 24px">
 <a href="${appUrl}/pipeline" style="display:inline-block;background:${C.accent};color:#fff;font-weight:600;font-size:14px;padding:10px 16px;border-radius:6px;text-decoration:none">Abrir Minhas disputas</a>
 </td></tr>
 </table>
 <p style="font-size:12px;color:${C.muted};max-width:600px">${escapeHtml(AVISO_DIGEST)}</p>
-<p style="font-size:12px;color:${C.muted};max-width:600px">Você recebe este e-mail porque criou alertas no Vencedital. <a href="${appUrl}/alertas" style="color:${C.muted}">Gerenciar alertas</a>.</p>
+<p style="font-size:12px;color:${C.muted};max-width:600px">${total === 0 ? "Você recebe este e-mail porque acompanha empresas no Vencedital." : "Você recebe este e-mail porque criou alertas no Vencedital."} <a href="${appUrl}/alertas" style="color:${C.muted}">${total === 0 ? "Quem você acompanha" : "Gerenciar alertas"}</a>.</p>
 </td></tr></table></body></html>`;
   return { subject, html, text };
 }
 
 export interface DigestDoUsuario {
   email: string;
+  userId: number;
   grupos: Grupos;
+  /** All the user's active alerts, also the ones with no new edital today (they still feed the recompra section). */
+  alerts: Alert[];
 }
 
 /** Who gets an e-mail now and what is in it: the open, not-yet-sent editais of each user's active alerts. */
@@ -177,7 +219,7 @@ export async function montarDigests(db: Pool): Promise<DigestDoUsuario[]> {
       const editais = await matchesForAlert(db, alert);
       if (editais.length) grupos.push({ alert, editais });
     }
-    if (grupos.length) digests.push({ email, grupos });
+    if (grupos.length) digests.push({ email, userId: userAlerts[0].user_id, grupos, alerts: userAlerts });
   }
   return digests;
 }
@@ -210,13 +252,78 @@ export async function prepararResumosDoDigest(
   return { escolhidos: ids.size, resumidos };
 }
 
-/** Sends one digest per user covering all their active alerts. Returns how many e-mails went out. */
+/**
+ * Runs the lookup of one optional section of the digest on its own connection with a 20 s limit. A slow query or an
+ * error only costs the section: the e-mail goes out without it and what it would have shown stays unsent for the next day.
+ */
+async function secaoComLimite<T>(db: Pool, rotulo: string, log: (m: string) => void, fn: (c: PoolClient) => Promise<T>): Promise<T | null> {
+  const client = await db.connect();
+  try {
+    await client.query("set statement_timeout = 20000");
+    return await fn(client);
+  } catch (e) {
+    log(`${rotulo}: sem a seção (${e instanceof Error ? e.message : e})`);
+    return null;
+  } finally {
+    await client.query("reset statement_timeout").catch(() => {});
+    client.release();
+  }
+}
+
+async function recomprasDoDigest(db: Pool, userId: number, alerts: Alert[], hoje: string, log: (m: string) => void): Promise<Recompras | null> {
+  const r = await secaoComLimite(db, `recompra, usuário ${userId}`, log, async (c) => {
+    const { rows } = await c.query<{ cnpj: string | null }>(`select cnpj from users where id = $1`, [userId]);
+    return recomprasDoUsuario(c, userId, alerts, hoje, { cnpj: rows[0]?.cnpj ?? null });
+  });
+  return r && !vazio(r) ? r : null;
+}
+
+async function concorrentesDoDigest(db: Pool, userId: number, log: (m: string) => void): Promise<Conc.Concorrentes | null> {
+  const r = await secaoComLimite(db, `concorrentes, usuário ${userId}`, log, (c) => Conc.contratosDosConcorrentes(c, userId));
+  return r && !Conc.vazio(r) ? r : null;
+}
+
+/**
+ * The short e-mail for a user who has a certificate to warn about but no new edital today. Same footer rules as the
+ * digest: plain tables, inline styles, a text version.
+ */
+export function renderAvisoCertidoes(appUrl: string, avisos: AvisoCertidao[]): Omit<Mail, "to"> {
+  const subject = avisos.length === 1 ? avisos[0].texto.replace(/\.$/, "") : `${avisos.length} certidões perto de vencer`;
+  const text = [subject, "", ...avisos.map((a) => `- ${a.texto}${a.link ? ` Emitir: ${a.link}` : ""}`), "", `Minhas certidões: ${appUrl}/certidoes`].join("\n");
+  const html = `<!doctype html><html><body style="margin:0;background:${C.bg}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${C.text}">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid ${C.border};border-radius:12px">
+<tr><td style="padding:20px 24px">
+<span style="font-weight:700;color:${C.accent}">Vencedital</span>
+<div style="font-size:20px;font-weight:700;margin:8px 0 12px">${escapeHtml(subject)}</div>
+${avisos.map(linhaDeAviso).join("")}
+<div style="margin-top:14px"><a href="${appUrl}/certidoes" style="display:inline-block;background:${C.accent};color:#fff;font-weight:600;font-size:14px;padding:10px 16px;border-radius:6px;text-decoration:none">Ver minhas certidões</a></div>
+</td></tr>
+</table>
+<p style="font-size:12px;color:${C.muted};max-width:600px">Você recebe este aviso porque cadastrou a validade das suas certidões no Vencedital. Confira sempre a data no documento oficial. Vencedital · ${escapeHtml(EMPRESA.razaoSocial)} · sem vínculo com o governo.</p>
+</td></tr></table></body></html>`;
+  return { subject, html, text };
+}
+
+/**
+ * Sends one digest per user covering all their active alerts, with the certificate warnings of the day on top; a user
+ * with a warning and no new edital gets the short e-mail. Returns how many e-mails went out.
+ */
 export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => void = () => {}): Promise<number> {
+  const hoje = hojeDasCertidoes();
+  const pendentes = new Map((await avisosPendentes(db, hoje)).map((a) => [a.email, a.certidoes]));
   let enviados = 0;
-  for (const { email, grupos } of await montarDigests(db)) {
+  const comDigest = new Set<string>();
+  for (const { email, userId, grupos, alerts } of await montarDigests(db)) {
+    comDigest.add(email);
+    const certidoes = pendentes.get(email) ?? [];
+    pendentes.delete(email);
     const ids = escolherParaResumo(grupos.flatMap((g) => g.editais)).map((e) => e.id);
     const resumos = await resumosDoCache(db, ids);
-    await sendMail({ to: email, ...renderDigest(appUrl, grupos, new Date(), resumos) });
+    const recompras = await recomprasDoDigest(db, userId, alerts, hoje, log);
+    const concorrentes = await concorrentesDoDigest(db, userId, log);
+    await sendMail({ to: email, ...renderDigest(appUrl, grupos, new Date(), resumos, avisosDasCertidoes(certidoes, hoje), recompras, concorrentes) });
     // Recorded only after the send succeeds, so a failed SMTP call retries the same editais next run.
     for (const g of grupos) {
       await db.query(
@@ -224,9 +331,31 @@ export async function sendDigests(db: Pool, appUrl: string, log: (m: string) => 
         [g.alert.id, g.editais.map((e) => e.id)],
       );
     }
+    await marcarAvisadas(db, certidoes.map((c) => c.id), hoje);
+    if (recompras) await marcarEnviadas(db, userId, recompras);
+    if (concorrentes) await Conc.marcarVistos(db, userId);
     enviados++;
     log(`${email}: ${grupos.reduce((n, g) => n + g.editais.length, 0)} editais`);
   }
+  // Users with no new edital today but with new contracts of a followed company: the digest goes out with only that
+  // section (and the certificate warnings, if any).
+  for (const { id: userId, email } of await Conc.usuariosQueSeguem(db)) {
+    if (comDigest.has(email)) continue;
+    const concorrentes = await concorrentesDoDigest(db, userId, log);
+    if (!concorrentes) continue;
+    const certidoes = pendentes.get(email) ?? [];
+    pendentes.delete(email);
+    await sendMail({ to: email, ...renderDigest(appUrl, [], new Date(), new Map(), avisosDasCertidoes(certidoes, hoje), null, concorrentes) });
+    await marcarAvisadas(db, certidoes.map((c) => c.id), hoje);
+    await Conc.marcarVistos(db, userId);
+    enviados++;
+    log(`${email}: contratos de concorrentes`);
+  }
+  for (const [email, certidoes] of pendentes) {
+    await sendMail({ to: email, ...renderAvisoCertidoes(appUrl, avisosDasCertidoes(certidoes, hoje)) });
+    await marcarAvisadas(db, certidoes.map((c) => c.id), hoje);
+    enviados++;
+    log(`${email}: aviso de ${certidoes.length} certidão(ões)`);
+  }
   return enviados;
 }
-
