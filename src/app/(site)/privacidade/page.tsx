@@ -9,7 +9,11 @@ export const metadata: Metadata = {
 };
 
 const GUARDAMOS = [
-  ["E-mail, alertas, disputas, checklists e notas", "Fazer o serviço funcionar: login, alerta diário, quadro de disputas", "Execução de contrato (art. 7º, V)"],
+  [
+    "E-mail, CNPJ da empresa, senha (guardada só como hash, que não dá para reverter), alertas, disputas, checklists e notas",
+    "Fazer o serviço funcionar: login, alerta diário, quadro de disputas",
+    "Execução de contrato (art. 7º, V)",
+  ],
   ["Se você assinar: razão social, CNPJ, endereço fiscal e histórico de pagamentos", "Cobrar e emitir nota fiscal", "Contrato e obrigação legal (art. 7º, V e II)"],
   ["Registros de acesso (IP, data, hora)", "Exigência do Marco Civil da Internet (art. 15)", "Obrigação legal (art. 7º, II)"],
   ["Dados técnicos de uso", "Segurança e prevenção de abuso", "Legítimo interesse (art. 7º, IX)"],

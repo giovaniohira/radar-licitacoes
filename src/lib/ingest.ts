@@ -127,11 +127,23 @@ export async function upsertContratos(db: Pool, items: PncpContrato[]) {
   return { inseridos, atualizados: res.rows.length - inseridos };
 }
 
-/** Ingests every contract published on `dia`. Idempotent, like ingestDia. */
+/**
+ * Pause after `ocupadoMs` of database work so the work is at most `ritmo` (0-1) of the wall time.
+ * Network wait while fetching is not counted as idle, so the real share is lower.
+ */
+export const pausaParaRitmo = (ocupadoMs: number, ritmo?: number) =>
+  ritmo && ritmo > 0 && ritmo < 1 ? Math.round(ocupadoMs * (1 / ritmo - 1)) : 0;
+
+const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Ingests every contract published on `dia`. Idempotent, like ingestDia.
+ * `ritmo` caps the share of time spent writing, for backfills on the shared 1-CPU server (Hostinger flags sustained use).
+ */
 export async function ingestContratosDia(
   db: Pool,
   dia: string,
-  { log = () => {}, fetchOpts }: { log?: IngestLog; fetchOpts?: FetchOpts } = {},
+  { log = () => {}, fetchOpts, ritmo }: { log?: IngestLog; fetchOpts?: FetchOpts; ritmo?: number } = {},
 ): Promise<IngestResult> {
   const total: IngestResult = { dia, registros: 0, inseridos: 0, atualizados: 0 };
   let pagina = 1;
@@ -139,7 +151,9 @@ export async function ingestContratosDia(
   for (;;) {
     const page = await fetchContratos(dia, pagina, { minIntervalMs: 700, ...fetchOpts });
     if (!page || page.empty || page.data.length === 0) break;
+    const t0 = Date.now();
     const r = await upsertContratos(db, page.data);
+    await dormir(pausaParaRitmo(Date.now() - t0, ritmo));
     total.registros += page.data.length;
     total.inseridos += r.inseridos;
     total.atualizados += r.atualizados;

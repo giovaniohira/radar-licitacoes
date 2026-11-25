@@ -3,12 +3,15 @@
 // npx tsx scripts/ingest.ts 2026-10-01 2026-10-07 [--modalidades=6,8]
 // npx tsx scripts/ingest.ts 2026-07-01 2026-10-20 --contratos [--force]
 //   -> signed contracts instead; days already finished are skipped unless --force, so a backfill can resume.
+//   --ritmo=0.15 -> database writes take at most 15% of the time (pauses after each page). Use it for backfills:
+//   the server has 1 shared CPU and Hostinger flags sustained use.
 import { closePool, pool } from "../src/lib/db";
 import { dias, hojeBR, ingestContratosDia, ingestDia } from "../src/lib/ingest";
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const flag = (f: string) => process.argv.includes(f);
 const mods = process.argv.find((a) => a.startsWith("--modalidades="))?.split("=")[1];
+const ritmo = Number(process.argv.find((a) => a.startsWith("--ritmo="))?.split("=")[1]) || undefined;
 const from = args[0] ?? hojeBR(-1);
 const to = args[1] ?? (args[0] ? args[0] : hojeBR(0));
 
@@ -21,7 +24,7 @@ async function main() {
   for (const dia of dias(from, to)) {
     if (feitos.has(dia) && dia < hojeBR(-1)) continue;
     const r = flag("--contratos")
-      ? await ingestContratosDia(db, dia, { log: (m) => console.log(m) })
+      ? await ingestContratosDia(db, dia, { log: (m) => console.log(m), ritmo })
       : await ingestDia(db, dia, { modalidades: mods ? mods.split(",").map(Number) : undefined, log: (m) => console.log(m) });
     console.log(`${dia}: ${r.registros} lidos, ${r.inseridos} novos, ${r.atualizados} atualizados`);
   }
