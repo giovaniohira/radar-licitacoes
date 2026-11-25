@@ -92,7 +92,7 @@ export function renderDigest(
   const nConc = concorrentes ? concorrentes.itens.length + concorrentes.alemDoLimite : 0;
   const subject =
     total === 0 && nConc > 0
-      ? `${nConc} ${nConc === 1 ? "contrato novo" : "contratos novos"} dos seus concorrentes`
+      ? `${nConc} ${nConc === 1 ? "contrato novo" : "contratos novos"} das empresas que você acompanha`
       : `${total} ${total === 1 ? "novo edital" : "novos editais"} para você`;
   const link = (e: EditalResumo) => `${appUrl}/edital/${encodeURIComponent(e.id)}`;
   const quando = (e: EditalResumo) =>
@@ -189,7 +189,7 @@ ${Conc.vazio(concorrentes) ? "" : Conc.htmlDaSecao(appUrl, concorrentes!, C)}${v
 </td></tr>
 </table>
 <p style="font-size:12px;color:${C.muted};max-width:600px">${escapeHtml(AVISO_DIGEST)}</p>
-<p style="font-size:12px;color:${C.muted};max-width:600px">${total === 0 ? "Você recebe este e-mail porque acompanha concorrentes no Vencedital." : "Você recebe este e-mail porque criou alertas no Vencedital."} <a href="${appUrl}/alertas" style="color:${C.muted}">${total === 0 ? "Quem você acompanha" : "Gerenciar alertas"}</a>.</p>
+<p style="font-size:12px;color:${C.muted};max-width:600px">${total === 0 ? "Você recebe este e-mail porque acompanha empresas no Vencedital." : "Você recebe este e-mail porque criou alertas no Vencedital."} <a href="${appUrl}/alertas" style="color:${C.muted}">${total === 0 ? "Quem você acompanha" : "Gerenciar alertas"}</a>.</p>
 </td></tr></table></body></html>`;
   return { subject, html, text };
 }

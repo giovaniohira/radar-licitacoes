@@ -73,7 +73,7 @@ async function Fornecedor({ params, searchParams }: PageProps<"/fornecedor/[ni]"
           )}
         </div>
       </header>
-      {first(sp.acompanhando) && <div className="notice ok">Você acompanha {nome(info.nome).replace(/\.$/, "")}. Os contratos novos dela chegam no e-mail das 7h.</div>}
+      {first(sp.acompanhando) && <div className="notice ok">Você acompanha {nome(info.nome).replace(/\.$/, "")}. Quando ela tiver contrato novo no PNCP, avisamos no e-mail das 7h.</div>}
       {first(sp.parou) && <div className="notice ok">Você parou de acompanhar {nome(info.nome).replace(/\.$/, "")}.</div>}
       {erro && <div className="notice">{erro}</div>}
 

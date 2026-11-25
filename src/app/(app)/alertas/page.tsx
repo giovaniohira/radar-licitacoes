@@ -141,14 +141,14 @@ async function Alertas({ searchParams }: PageProps<"/alertas">) {
 
           <section className="card card-pad stack" style={{ gap: 10 }} aria-labelledby="concorrentes-h">
             <div className="card-title">
-              <h2 id="concorrentes-h">Concorrentes acompanhados</h2>
+              <h2 id="concorrentes-h">Empresas que você acompanha</h2>
               <span className="xs subtle">
                 {seguidos.length} de {MAX_CONCORRENTES}
               </span>
             </div>
             {seguidos.length === 0 ? (
               <p className="small muted">
-                Abra a página de uma empresa e clique em Acompanhar: os contratos novos dela chegam no e-mail das 7h. <Link href="/mercado">Ver o mercado</Link>
+                Abra a página de uma empresa e clique em Acompanhar. Quando ela tiver contrato novo no PNCP, avisamos no e-mail das 7h. <Link href="/mercado">Ver o mercado</Link>
               </p>
             ) : (
               <ul className="seguidos-lista">

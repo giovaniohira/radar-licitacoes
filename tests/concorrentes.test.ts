@@ -17,9 +17,9 @@ const c = (extra: Partial<ContratoDoConcorrente> = {}): ContratoDoConcorrente =>
 const sp = (t: string) => t.replace(/ /g, " ");
 
 describe("linhas dos concorrentes", () => {
-  it("reads as '{Fornecedor} assinou contrato com {órgão}, {cidade-UF}: {objeto}, {valor}'", () => {
+  it("reads as '{Fornecedor} teve contrato publicado no PNCP com {órgão}, {cidade-UF}: {objeto}, {valor}'", () => {
     const p = partesDoContrato(c());
-    expect(sp(p.quem + p.resto)).toBe("Limpa Tudo Comercio LTDA assinou contrato com Prefeitura Municipal de Campinas, SP: Material de limpeza para as escolas, R$ 125.000");
+    expect(sp(p.quem + p.resto)).toBe("Limpa Tudo Comercio LTDA teve contrato publicado no PNCP com Prefeitura Municipal de Campinas, SP: Material de limpeza para as escolas, R$ 125.000");
   });
 
   it("leaves out a value that PNCP reports as zero or missing", () => {
@@ -41,11 +41,11 @@ describe("renderDigest com a seção de concorrentes", () => {
 
   it("makes an e-mail with only this section when there is no edital", () => {
     const m = renderDigest("https://x.test", [], agora, new Map(), [], null, { itens: [c(), c({ id: "2" })], alemDoLimite: 0 });
-    expect(m.subject).toBe("2 contratos novos dos seus concorrentes");
+    expect(m.subject).toBe("2 contratos novos das empresas que você acompanha");
     expect(m.text).toContain(TITULO_DA_SECAO);
     expect(m.text).toContain("https://x.test/fornecedor/12345678000190");
     expect(m.html).toContain(TITULO_DA_SECAO);
-    expect(m.html).toContain("porque acompanha concorrentes");
+    expect(m.html).toContain("porque acompanha empresas");
     expect(m.html).not.toContain("novos editais");
   });
 
@@ -60,10 +60,10 @@ describe("renderDigest com a seção de concorrentes", () => {
 
   it("counts the contracts that did not fit and hides the section when empty", () => {
     const com = { itens: [c()], alemDoLimite: 3 };
-    expect(linhaDeResumo(1)).toBe("e mais 1 contrato dos seus concorrentes");
-    expect(textoDaSecao("https://x.test", com)).toContain("e mais 3 contratos dos seus concorrentes");
-    expect(htmlDaSecao("https://x.test", com, cores)).toContain("e mais 3 contratos dos seus concorrentes");
-    expect(renderDigest("https://x.test", [], agora, new Map(), [], null, { itens: [c()], alemDoLimite: 3 }).subject).toBe("4 contratos novos dos seus concorrentes");
+    expect(linhaDeResumo(1)).toBe("e mais 1 contrato das empresas que você acompanha");
+    expect(textoDaSecao("https://x.test", com)).toContain("e mais 3 contratos das empresas que você acompanha");
+    expect(htmlDaSecao("https://x.test", com, cores)).toContain("e mais 3 contratos das empresas que você acompanha");
+    expect(renderDigest("https://x.test", [], agora, new Map(), [], null, { itens: [c()], alemDoLimite: 3 }).subject).toBe("4 contratos novos das empresas que você acompanha");
     expect(vazio(null)).toBe(true);
     expect(vazio({ itens: [], alemDoLimite: 0 })).toBe(true);
     const m = renderDigest("https://x.test", [], agora, new Map(), [], null, { itens: [], alemDoLimite: 0 });

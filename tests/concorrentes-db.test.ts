@@ -125,9 +125,9 @@ describe.skipIf(!url)("acompanhar concorrente (banco)", () => {
     expect(await sendDigests(db, "https://x.test")).toBe(1);
     const texto = saidas.join("\n");
     expect(texto).toContain("para: so-concorrentes@teste.com");
-    expect(texto).toContain("assunto: 1 contrato novo dos seus concorrentes");
+    expect(texto).toContain("assunto: 1 contrato novo das empresas que você acompanha");
     expect(texto).toContain(TITULO_DA_SECAO);
-    expect(texto).toContain("Rival Servicos LTDA assinou contrato com");
+    expect(texto).toContain("Rival Servicos LTDA teve contrato publicado no PNCP com");
     expect(texto).toContain("https://x.test/fornecedor/" + cnpj(7));
 
     // The next run sends nothing: the contract was shown.

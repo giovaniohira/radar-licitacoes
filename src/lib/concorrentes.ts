@@ -99,19 +99,19 @@ export async function marcarVistos(db: Consulta, userId: number): Promise<void> 
 
 export const vazio = (c: Concorrentes | null | undefined) => !c || c.itens.length === 0;
 
-export const TITULO_DA_SECAO = "Seus concorrentes";
+export const TITULO_DA_SECAO = "Empresas que você acompanha";
 
 const valorDoContrato = (v: number | null) => (v && v > 0 ? formatBRL(v) : null);
 
-/** "{Fornecedor} assinou contrato com {órgão}, {cidade-UF}: {objeto curto}, {valor}". */
+/** "{Fornecedor} teve contrato publicado no PNCP com {órgão}, {cidade-UF}: {objeto curto}, {valor}". */
 export function partesDoContrato(c: ContratoDoConcorrente) {
   return {
     quem: nome(c.fornecedor) || "Fornecedor",
-    resto: ` assinou contrato com ${nome(c.orgao)}, ${local(c.municipio, c.uf, c.orgao) || "—"}: ${tituloCurto(frase(c.objeto), 90)}${valorDoContrato(c.valor_global) ? `, ${valorDoContrato(c.valor_global)}` : ""}`,
+    resto: ` teve contrato publicado no PNCP com ${nome(c.orgao)}, ${local(c.municipio, c.uf, c.orgao) || "—"}: ${tituloCurto(frase(c.objeto), 90)}${valorDoContrato(c.valor_global) ? `, ${valorDoContrato(c.valor_global)}` : ""}`,
   };
 }
 
-export const linhaDeResumo = (n: number) => `e mais ${n} ${n === 1 ? "contrato" : "contratos"} dos seus concorrentes`;
+export const linhaDeResumo = (n: number) => `e mais ${n} ${n === 1 ? "contrato" : "contratos"} das empresas que você acompanha`;
 
 export function textoDaSecao(appUrl: string, c: Concorrentes): string {
   return [
@@ -130,7 +130,7 @@ export function htmlDaSecao(appUrl: string, c: Concorrentes, cores: { text: stri
       const p = partesDoContrato(x);
       return `<tr><td style="padding:12px 0;border-bottom:1px solid ${cores.border};font-size:14px;line-height:20px;color:${cores.text}">
 <b>${escapeHtml(p.quem)}</b>${escapeHtml(p.resto)}
-<div><a href="${appUrl}/fornecedor/${x.fornecedor_ni}" style="display:inline-block;padding:8px 0;color:${cores.text};font-size:13px;font-weight:600;text-decoration:underline">Ver fornecedor</a></div>
+<div><a href="${appUrl}/fornecedor/${x.fornecedor_ni}" style="display:inline-block;padding:8px 0;color:${cores.text};font-size:13px;font-weight:600;text-decoration:underline">Ver empresa</a></div>
 </td></tr>`;
     })
     .join("");
