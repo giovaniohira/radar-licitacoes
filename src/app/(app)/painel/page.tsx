@@ -1,13 +1,17 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Icon } from "@/components/icons";
 import { EditalRow, EditalRows, Empty, Interesse, Loading, editalHref } from "@/components/ui";
 import { ROTULO_DO_SELO, estadoDaCertidao, hojeBR, listarCertidoes, nomeDaCertidao, selosDoPipeline, TIPOS_FIXOS, type Certidao } from "@/lib/certidoes";
 import { pool, query } from "@/lib/db";
 import { formatBRLCompact, formatInt, frase, horasAtras, nome, prazoTom, tituloCurto } from "@/lib/format";
+import { COOKIE_SEGUIR } from "@/lib/concorrentes";
 import { first } from "@/lib/params";
+import { AVISO_DA_SECAO, partesDoItem, recomprasEnviadas, type Contrato } from "@/lib/recompra";
 import { ETAPAS, etapaLabel, listPipeline, vencendo, type Etapa, type PipelineItem } from "@/lib/pipeline";
 import { buildSearch, type EditalResumo } from "@/lib/search";
 import { resumoConfigurado } from "@/lib/summary-tipos";
@@ -229,16 +233,46 @@ function CertidoesCard({ certidoes, itens }: { certidoes: Certidao[]; itens: Pip
   );
 }
 
+/** The contracts the last 30 days of e-mails told about whose end date has not come yet. Hidden when there are none. */
+function RecomprasCard({ contratos }: { contratos: Contrato[] }) {
+  if (!contratos.length) return null;
+  return (
+    <section className="card card-pad stack" style={{ gap: 10 }} aria-label="Contratos que terminam em breve">
+      <div className="card-title">
+        <h2>Contratos que terminam em breve</h2>
+      </div>
+      <ul className="recompra-lista">
+        {contratos.map((c) => {
+          const p = partesDoItem(c);
+          return (
+            <li key={c.id}>
+              <Link href={`/orgao/${c.orgao_cnpj}`} className="t">
+                {p.objeto}
+              </Link>
+              <span className="xs muted">{p.comprador}</span>
+              <span className="xs">{p.detalhe}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="xs subtle">{AVISO_DA_SECAO}</p>
+    </section>
+  );
+}
+
 async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchParams">) {
   await connection();
   const user = await requireUser();
+  // "Acompanhar" clicked before the account existed: finish it and go back to the company (see /seguir/retorno).
+  if ((await cookies()).get(COOKIE_SEGUIR)) redirect("/seguir/retorno");
   const sp = await searchParams;
   const aba = first(sp.alerta);
-  const [itens, alerts, [{ resumiu }], certidoes] = await Promise.all([
+  const [itens, alerts, [{ resumiu }], certidoes, recompras] = await Promise.all([
     listPipeline(pool(), user.id),
     query<AlertRow>(`select id, nome, palavras, ufs, modalidades, valor_min, valor_max from alerts where user_id = $1 and ativo order by id`, [user.id]),
     query<{ resumiu: boolean }>(`select exists (select 1 from pipeline p join resumos r using (edital_id) where p.user_id = $1) as resumiu`, [user.id]),
     listarCertidoes(pool(), user.id),
+    recomprasEnviadas(pool(), user.id, hojeBR()),
   ]);
 
   // New matches per alert in the last 24h, same query the daily digest uses.
@@ -362,6 +396,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/painel">, "searchPara
           <Semana itens={itens} />
           <EmDisputa itens={itens} />
           <CertidoesCard certidoes={certidoes} itens={itens} />
+          <RecomprasCard contratos={recompras} />
         </aside>
       </div>
     </div>

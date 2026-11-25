@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { cacheLife } from "next/cache";
+import { SubmitButton } from "@/components/SubmitButton";
 import { editalHref } from "@/components/ui";
+import { ehCnpj } from "@/lib/concorrentes";
 import { pool } from "@/lib/db";
 import { formatBRL, formatDia, frase, nome, tituloCurto } from "@/lib/format";
 import { quemGanhou, termosDoObjeto } from "@/lib/quemganhou";
+import { seguirForm } from "../../../actions/concorrentes";
 
 // The lookup reads the buyer's contracts through two indexes; on the production database a cold run can take seconds,
 // and contracts only change when the 06h ingest runs, so each (buyer, words) result is kept for an hour.
@@ -64,7 +67,17 @@ export async function QuemJaGanhou({ cnpj, objeto, excluir }: { cnpj: string; ob
                 {r.contratos.map((c) => (
                   <tr key={c.id}>
                     <td style={{ minWidth: 220 }}>{tituloCurto(frase(c.objeto), 100)}</td>
-                    <td>{c.fornecedor_ni ? <Link href={`/fornecedor/${c.fornecedor_ni}`}>{nome(c.fornecedor)}</Link> : nome(c.fornecedor)}</td>
+                    <td>
+                      {c.fornecedor_ni ? <Link href={`/fornecedor/${c.fornecedor_ni}`}>{nome(c.fornecedor)}</Link> : nome(c.fornecedor)}
+                      {c.fornecedor_ni && ehCnpj(c.fornecedor_ni) && (
+                        <form action={seguirForm} style={{ marginTop: 4 }}>
+                          <input type="hidden" name="ni" value={c.fornecedor_ni} />
+                          <SubmitButton className="btn btn-ghost btn-sm" style={{ padding: 0, height: 28 }} aria-label={`Acompanhar ${nome(c.fornecedor)}`}>
+                            Acompanhar
+                          </SubmitButton>
+                        </form>
+                      )}
+                    </td>
                     <td className="num nowrap" style={{ textAlign: "right" }}>
                       {valor(c.valor_global)}
                     </td>
