@@ -6,7 +6,7 @@ import { matchesForAlert, sendDigests, type Alert } from "@/lib/alerts";
 import { ingestDia, upsertContratacoes, upsertContratos } from "@/lib/ingest";
 import { analisar, contratosRecentes } from "@/lib/mercado";
 import { addToPipeline, listPipeline, moveCard } from "@/lib/pipeline";
-import { contratoMaisAntigo, quemGanhou, termosDoObjeto } from "@/lib/quemganhou";
+import { contratoMaisAntigo, quemGanhou, quemGanhouNaUf, termosDoObjeto } from "@/lib/quemganhou";
 import type { PncpContratacao, PncpContrato, PncpPage } from "@/lib/pncp";
 import { buildSearch, type EditalResumo } from "@/lib/search";
 
@@ -182,6 +182,20 @@ describe.skipIf(!url)("database", () => {
       // The oldest publication date is what the empty state tells the visitor.
       await db.query(`insert into contratos (id, orgao_cnpj, orgao, objeto, publicado_em, raw) values ('qg-antigo', $1, 'ORGAO TESTE', 'Contrato antigo', '2020-01-05T12:00:00Z', '{}')`, [A]);
       expect((await contratoMaisAntigo(db))?.startsWith("2020-01-05")).toBe(true);
+
+      // Other buyers of the same state and sphere: B counts, A itself, another state, another sphere and old contracts do not.
+      const C = "99000000000003";
+      const recente = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+      await novo("qg-c-velho", C, "Contratação de seguro veicular para viatura", { dia: "2020-03-01" });
+      await novo("qg-c-outra-uf", C, "Contratação de seguro veicular para viatura", { dia: recente });
+      await novo("qg-c-estadual", C, "Contratação de seguro veicular para viatura", { dia: recente });
+      await db.query(`update contratos set uf = 'GO', esfera = 'M', data_assinatura = $1 where id in ('qg-a1', 'qg-b1')`, [recente]);
+      await db.query(`update contratos set uf = 'GO', esfera = 'M' where id = 'qg-c-velho'`);
+      await db.query(`update contratos set uf = 'SP', esfera = 'M' where id = 'qg-c-outra-uf'`);
+      await db.query(`update contratos set uf = 'GO', esfera = 'E' where id = 'qg-c-estadual'`);
+      const naUf = await quemGanhouNaUf(db, "GO", "M", A, termos);
+      expect(naUf.contratos.map((c) => c.id)).toEqual(["qg-b1"]);
+      expect(naUf.contratos[0]).toMatchObject({ orgao: "ORGAO TESTE" });
     } finally {
       await db.query(`delete from contratos where id like 'qg-%'`);
     }

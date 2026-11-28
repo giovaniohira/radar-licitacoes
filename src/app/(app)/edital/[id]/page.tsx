@@ -385,7 +385,7 @@ async function Edital({ params }: PageProps<"/edital/[id]">) {
       </section>
 
       <Suspense fallback={<section className="card card-pad" style={{ minHeight: 96 }}><p className="small muted">Buscando contratos parecidos deste órgão…</p></section>}>
-        <QuemJaGanhou cnpj={e.cnpj} objeto={e.objeto} excluir={`${e.orgao} ${e.municipio ?? ""} ${e.unidade ?? ""}`} />
+        <QuemJaGanhou cnpj={e.cnpj} objeto={e.objeto} excluir={`${e.orgao} ${e.municipio ?? ""} ${e.unidade ?? ""}`} uf={e.uf} esfera={e.esfera} />
       </Suspense>
 
       <div className="cols">
