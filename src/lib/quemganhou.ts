@@ -55,6 +55,8 @@ export function termosDoObjeto(objeto: string, excluir = "", max = 6): string[] 
 export interface ContratoParecido {
   id: string;
   objeto: string;
+  orgao: string;
+  municipio: string | null;
   fornecedor: string | null;
   fornecedor_ni: string | null;
   valor_global: number | null;
@@ -101,14 +103,17 @@ export function prefiltroGin(termos: string[]): string {
   return pares.join(" | ");
 }
 
-/** $1 buyer CNPJ, $2 words, $3 minimum words, $4 list size, $5 how many leading words count as the object, $6 index prefilter (prefiltroGin). */
-export const SQL_QUEM_GANHOU = `with q as (select to_tsquery('portuguese', f_unaccent(t)) as tq, n from unnest($2::text[]) with ordinality as u(t, n)),
+/**
+ * $2 words, $3 minimum words, $4 list size, $5 how many leading words count as the object, $6 index prefilter (prefiltroGin).
+ * `onde` picks whose contracts are read: the buyer ($1 CNPJ), or other buyers of the same state and sphere (see quemGanhouNaUf).
+ */
+export const sqlQuemGanhou = (onde: string) => `with q as (select to_tsquery('portuguese', f_unaccent(t)) as tq, n from unnest($2::text[]) with ordinality as u(t, n)),
           m as (
-            select k.id, k.objeto, k.fornecedor, k.fornecedor_ni, k.valor_global, k.data_assinatura, k.compra_id,
+            select k.id, k.objeto, k.orgao, k.municipio, k.fornecedor, k.fornecedor_ni, k.valor_global, k.data_assinatura, k.compra_id,
                    (select count(*) from q where k.busca @@ q.tq) as acertos,
                    (select count(*) from q where q.n <= $5 and k.busca @@ q.tq) as da_cabeca
             from contratos k
-            where k.orgao_cnpj = $1 and k.tipo_pessoa <> 'PF' and k.fornecedor is not null
+            where ${onde} and k.tipo_pessoa <> 'PF' and k.fornecedor is not null
               and k.busca @@ to_tsquery('portuguese', $6)
           ),
           -- Only contracts within one word of the best match: a buyer with a close match should not also list loose ones.
@@ -125,21 +130,32 @@ export const SQL_QUEM_GANHOU = `with q as (select to_tsquery('portuguese', f_una
           top as (
             select * from ok order by acertos desc, data_assinatura desc nulls last, valor_global desc nulls last limit $4
           )
-     select top.id, top.objeto, top.fornecedor, top.fornecedor_ni, top.valor_global::float8 as valor_global,
+     select top.id, top.objeto, top.orgao, top.municipio, top.fornecedor, top.fornecedor_ni, top.valor_global::float8 as valor_global,
             top.data_assinatura::text as data_assinatura, top.compra_id,
             exists (select 1 from editais e where e.id = top.compra_id) as tem_edital,
             s.total, s.desde, s.vmin, s.vmax
      from s left join top on true
      order by top.data_assinatura desc nulls last, top.valor_global desc nulls last`;
 
-export async function quemGanhou(db: Pool, cnpj: string, termos: string[], limite = LIMITE_QUEM_GANHOU): Promise<QuemGanhou> {
+const SQL_DO_ORGAO = sqlQuemGanhou("k.orgao_cnpj = $1");
+// Other buyers of the same state and sphere, last 24 months: $1 UF, $7 esfera, $8 the buyer itself (already looked at).
+const SQL_DA_UF = sqlQuemGanhou(
+  "k.uf = $1 and k.esfera = $7 and k.orgao_cnpj <> $8 and k.data_assinatura >= current_date - interval '24 months'",
+);
+
+async function rodar(db: Pool, sql: string, primeiro: string, termos: string[], limite: number, extra: string[] = []): Promise<QuemGanhou> {
   const vazio: QuemGanhou = { contratos: [], total: 0, desde: null, valorMin: null, valorMax: null };
   if (!termos.length) return vazio;
   // Each word goes through the same Portuguese stemming as the index (f_unaccent + 'portuguese'), one tsquery per word.
-  const { rows } = await db.query<ContratoParecido & { total: string; desde: string | null; vmin: number | null; vmax: number | null }>(
-    SQL_QUEM_GANHOU,
-    [cnpj, termos, minimoDePalavras(termos.length), limite, PALAVRAS_DO_OBJETO, prefiltroGin(termos)],
-  );
+  const { rows } = await db.query<ContratoParecido & { total: string; desde: string | null; vmin: number | null; vmax: number | null }>(sql, [
+    primeiro,
+    termos,
+    minimoDePalavras(termos.length),
+    limite,
+    PALAVRAS_DO_OBJETO,
+    prefiltroGin(termos),
+    ...extra,
+  ]);
   const s = rows[0];
   if (!s || Number(s.total) === 0) return vazio;
   return {
@@ -148,6 +164,8 @@ export async function quemGanhou(db: Pool, cnpj: string, termos: string[], limit
       .map((r) => ({
         id: r.id,
         objeto: r.objeto,
+        orgao: r.orgao,
+        municipio: r.municipio,
         fornecedor: r.fornecedor,
         fornecedor_ni: r.fornecedor_ni,
         valor_global: r.valor_global,
@@ -161,6 +179,16 @@ export async function quemGanhou(db: Pool, cnpj: string, termos: string[], limit
     valorMax: s.vmax,
   };
 }
+
+export const quemGanhou = (db: Pool, cnpj: string, termos: string[], limite = LIMITE_QUEM_GANHOU) =>
+  rodar(db, SQL_DO_ORGAO, cnpj, termos, limite);
+
+/** The same search over the other buyers of the edital's state and sphere (municipal, state, federal), for a buyer with too little history. */
+export const quemGanhouNaUf = (db: Pool, uf: string, esfera: string, excluirCnpj: string, termos: string[], limite = LIMITE_QUEM_GANHOU) =>
+  rodar(db, SQL_DA_UF, uf, termos, limite, [esfera, excluirCnpj]);
+
+/** Below this many similar contracts of the buyer itself, the section shows the state's other buyers instead. */
+export const MINIMO_DO_ORGAO = 2;
 
 /** Publication date of the oldest contract we hold, so the empty state says how far back we really look. */
 export async function contratoMaisAntigo(db: Pool): Promise<string | null> {
